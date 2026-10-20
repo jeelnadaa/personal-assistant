@@ -79,15 +79,16 @@ def _get_start_menu_shortcuts() -> dict[str, Path]:
 @tool(
     name="open_app",
     description=(
-        "Opens an application by its friendly name (e.g. 'notepad', 'chrome', 'calculator', 'spotify'). "
-        "Prefer this over manual clicking. Returns confirmation and the method used to launch."
+        "Universal application launcher for Windows 11. "
+        "Discovers installed software from Start Menu, Desktop shortcuts, Registry App Paths, "
+        "and system locations with fuzzy matching and disambiguation support."
     ),
     input_schema={
         "type": "object",
         "properties": {
             "name": {
                 "type": "string",
-                "description": "Friendly name of the application to launch (e.g., 'notepad', 'chrome', 'spotify').",
+                "description": "Name or query of the application to launch (e.g., 'chrome', 'excel', 'spotify', 'cadcraft').",
             }
         },
         "required": ["name"],
@@ -96,41 +97,62 @@ def _get_start_menu_shortcuts() -> dict[str, Path]:
     category="apps",
 )
 def open_app(name: str) -> ToolResult:
-    """Launches an application using alias mapping, Start Menu search, or os.startfile."""
-    clean_name = name.strip().lower()
+    """Launches an application using the universal AppResolver service."""
+    from jarvis.services.app_resolver import get_app_resolver
 
-    # Strategy (a): Built-in alias map
-    if clean_name in APP_ALIASES:
-        target = APP_ALIASES[clean_name]
-        try:
-            os.startfile(target)
-            return ToolResult(ok=True, output=f"Launched '{name}' via alias mapping ({target}).")
-        except Exception as e:
-            logger.warning("Alias launch failed for %s (%s): %s", clean_name, target, e)
+    resolver = get_app_resolver()
+    ok, message = resolver.launch(name)
+    return ToolResult(ok=ok, output=message)
 
-    # Strategy (b): Start Menu shortcut fuzzy match
-    shortcuts = _get_start_menu_shortcuts()
-    if shortcuts:
-        matches = difflib.get_close_matches(clean_name, list(shortcuts.keys()), n=1, cutoff=0.5)
-        if matches:
-            matched_name = matches[0]
-            shortcut_path = shortcuts[matched_name]
-            try:
-                os.startfile(str(shortcut_path))
-                return ToolResult(
-                    ok=True,
-                    output=f"Launched '{name}' via Start Menu shortcut match: {shortcut_path.name}.",
-                )
-            except Exception as e:
-                logger.warning("Start Menu shortcut launch failed for %s: %s", shortcut_path, e)
 
-    # Strategy (c): Direct startfile / shell execute fallback
-    try:
-        os.startfile(name)
-        return ToolResult(ok=True, output=f"Launched '{name}' via system startfile.")
-    except Exception as e:
-        logger.error("Failed to open application '%s': %s", name, e)
-        return ToolResult(ok=False, output=f"Could not open '{name}': {str(e)}")
+@tool(
+    name="refresh_apps_index",
+    description="Forces a full rescan of Start Menu, Desktop shortcuts, and Windows Registry application paths.",
+    input_schema={"type": "object", "properties": {}},
+    dangerous=False,
+    category="apps",
+)
+def refresh_apps_index() -> ToolResult:
+    """Rescans all system application sources and refreshes the persistent cache."""
+    from jarvis.services.app_resolver import get_app_resolver
+
+    resolver = get_app_resolver()
+    count = resolver.refresh(force=True)
+    return ToolResult(ok=True, output=f"Successfully indexed {count} applications.")
+
+
+@tool(
+    name="list_apps",
+    description="Lists installed applications currently indexed by Jarvis matching an optional filter string.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "Optional search term to filter indexed applications by name.",
+            }
+        },
+    },
+    dangerous=False,
+    category="apps",
+)
+def list_apps(query: str = "") -> ToolResult:
+    """Lists indexed applications matching query."""
+    from jarvis.services.app_resolver import get_app_resolver
+
+    resolver = get_app_resolver()
+    clean_q = query.strip().lower()
+    matching = []
+
+    for key, app in resolver.apps.items():
+        if not clean_q or clean_q in key or any(clean_q in a for a in app.aliases):
+            matching.append(f"- {app.name} ({app.source})")
+
+    if not matching:
+        return ToolResult(ok=True, output=f"No installed applications found matching '{query}'.")
+
+    matching = sorted(set(matching))[:25]
+    return ToolResult(ok=True, output=f"Found {len(matching)} matching applications:\n" + "\n".join(matching))
 
 
 @tool(

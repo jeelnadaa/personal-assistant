@@ -13,9 +13,45 @@ from jarvis.tools.base import ToolResult, tool
 BROWSER_PROFILE_DIR = Path("data/browser_profile")
 
 
+SEARCH_ENGINE_URLS = {
+    "google": "https://www.google.com/search?q=",
+    "duckduckgo": "https://duckduckgo.com/?q=",
+    "bing": "https://www.bing.com/search?q=",
+    "brave": "https://search.brave.com/search?q=",
+}
+
+
+def normalize_spoken_url(spoken_text: str) -> str:
+    """Repairs common speech recognition artifacts in dictated URLs (e.g. 'github dot com')."""
+    cleaned = spoken_text.strip()
+    if not cleaned:
+        return ""
+
+    # Preserve data:, file:, and about: URLs without modifying inner content
+    if any(cleaned.startswith(p) for p in ("data:", "file://", "about:")):
+        return cleaned
+
+    # Replace spoken operators if present
+    lower = cleaned.lower()
+    if " dot " in lower or " slash " in lower or " colon " in lower:
+        cleaned = re.sub(r"\bdot\b", ".", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\bslash\b", "/", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\bcolon\b", ":", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\b(dash|hyphen)\b", "-", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\bat sign\b", "@", cleaned, flags=re.IGNORECASE)
+
+        # Collapse spacing around punctuation
+        cleaned = re.sub(r"\s*\.\s*", ".", cleaned)
+        cleaned = re.sub(r"\s*/\s*", "/", cleaned)
+        cleaned = re.sub(r"\s*:\s*", ":", cleaned)
+        cleaned = re.sub(r"\s+", "", cleaned)
+
+    return cleaned
+
+
 def _normalize_url(url: str) -> str:
-    """Ensures URL has a valid scheme, defaulting to https:// if none specified."""
-    clean = url.strip()
+    """Ensures URL has a valid scheme and repairs spoken phrasing."""
+    clean = normalize_spoken_url(url)
     schemes = ("http://", "https://", "file://", "data:", "about:")
     if not any(clean.startswith(s) for s in schemes):
         clean = "https://" + clean
@@ -215,12 +251,19 @@ def open_url(url: str) -> ToolResult:
     category="web",
 )
 def web_search(query: str) -> ToolResult:
-    """Opens default browser with Google search results for query."""
+    """Opens default browser with search results using configured search engine."""
+    import os
+    from jarvis.config import config
+
+    web_cfg = config.get("web", {})
+    engine = os.getenv("SEARCH_ENGINE", web_cfg.get("search_engine", "google")).strip().lower()
+    base_url = SEARCH_ENGINE_URLS.get(engine, SEARCH_ENGINE_URLS["google"])
+
     encoded = urllib.parse.quote_plus(query.strip())
-    search_url = f"https://www.google.com/search?q={encoded}"
+    search_url = f"{base_url}{encoded}"
     try:
         webbrowser.open(search_url)
-        return ToolResult(ok=True, output=f"Opened Google search for '{query}'.")
+        return ToolResult(ok=True, output=f"Opened {engine.capitalize()} search for '{query}'.")
     except Exception as e:
         logger.error("Failed to execute web search for '%s': %s", query, e)
         return ToolResult(ok=False, output=f"Failed to execute web search: {str(e)}")

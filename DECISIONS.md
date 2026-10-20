@@ -58,3 +58,19 @@
 - **Rate-Limited Crash Supervisor**: Implemented `CrashSupervisor` in `jarvis/crash_recovery.py` capturing unhandled exceptions, logging full tracebacks, and persisting crash timestamps in `data/crash_history.json`. Allows up to 3 automated restarts within a 1-hour rolling window before halting to prevent infinite failure loops.
 - **Pre-Flight Diagnostic Verification**: Implemented `jarvis/setup_check.py` and `scripts/setup_check.py` (`python main.py --check-setup`) verifying active LLM API keys and model configuration, audio input devices via `sounddevice`, ONNX wake word models via `openwakeword`, speech synthesis via `edge-tts`/`pyttsx3`, and Playwright Chromium automation.
 - **Graceful Multi-Component Teardown**: Updated `JarvisApp.stop()` to cleanly close the Playwright browser session, stop audio input streams, release the global kill switch hotkey, stop the system tray thread, and release the Windows named mutex.
+
+## Local AI & Core Improvements Decisions
+- **Hardware-Aware Local STT**: Detected NVIDIA GeForce RTX 3070 Laptop GPU (8GB VRAM) via `ctranslate2.get_cuda_device_count()`. Configured `faster-whisper` with `medium.en` model running on CUDA `float16` for near real-time, highly accurate English transcription. If CUDA is unavailable or initialization fails, automatically falls back to CPU `int8`.
+- **Offline Neural TTS with Piper**: Integrated `piper-tts` using the `en_GB-alan-medium` ONNX neural model. Synthesis yields 22,050 Hz float32 PCM streams fed into `sounddevice`, avoiding intermediate file I/O. Multi-engine priority is configured as `piper` -> `edge-tts` -> `pyttsx3` with dynamic fallback and user-adjustable `speech_rate` and `volume`.
+- **Universal Application Discovery (`AppResolver`)**: Decoupled application resolution into `jarvis/services/app_resolver.py`. Discovers executables across:
+  1. System and user Start Menu `.lnk` shortcuts
+  2. Public and user Desktop shortcuts
+  3. Windows Registry `HKLM` and `HKCU\Software\Microsoft\Windows\CurrentVersion\App Paths`
+  4. Windows Registry `Uninstall` entries
+  5. Windows UWP / Store application links
+  Discovered targets are cached in `data/apps_cache.json` with thread-safe persistence and automatic or manual refresh. Built-in alias precedence is maintained so common utility names (e.g. `editor` -> Notepad) are preserved. Disambiguation returns multiple matches when queries are ambiguous.
+- **Hybrid Customizable Wake Words**: Built-in openWakeWord models (`hey_jarvis`, `alexa`, etc.) are supported out-of-the-box. For arbitrary custom phrases (e.g. `hey bro`, `hello assistant`), implemented a two-stage hybrid detector in `jarvis/audio/wakeword.py`:
+  1. Stage 1: WebRTC VAD detects incoming speech segments in continuous 16kHz audio.
+  2. Stage 2: Segment is verified via local Whisper transcription against normalized target phrases.
+- **Phonetic Spoken URL Normalization**: Added `normalize_spoken_url()` in `jarvis/tools/web.py` to convert spoken URL patterns (e.g. "github dot com", "slash pull request") into valid HTTP URLs while preserving explicit schemes like `data:`, `file://`, and `about:`.
+- **Expanded Windows System Automation**: Added `media_control` using Windows virtual key codes (`VK_MEDIA_PLAY_PAUSE`, `VK_MEDIA_NEXT_TRACK`, `VK_MEDIA_PREV_TRACK`, `VK_MEDIA_STOP`), `get_network_info` for interface status and IP address diagnostics, and `cancel_shutdown` (`shutdown /a`).

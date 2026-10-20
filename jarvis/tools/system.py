@@ -31,12 +31,23 @@ SETTINGS_PAGE_MAP = {
     "sound": "ms-settings:sound",
     "volume": "ms-settings:sound",
     "apps": "ms-settings:appsfeatures",
+    "installed apps": "ms-settings:appsfeatures",
     "update": "ms-settings:windowsupdate",
     "windows update": "ms-settings:windowsupdate",
     "battery": "ms-settings:powersleep",
     "power": "ms-settings:powersleep",
     "storage": "ms-settings:storagesense",
     "notifications": "ms-settings:notifications",
+    "personalization": "ms-settings:personalization",
+    "background": "ms-settings:personalization-background",
+    "themes": "ms-settings:themes",
+    "printers": "ms-settings:printers",
+    "privacy": "ms-settings:privacy",
+    "gaming": "ms-settings:gaming-gamebar",
+    "default apps": "ms-settings:defaultapps",
+    "taskbar": "ms-settings:taskbar",
+    "date and time": "ms-settings:dateandtime",
+    "mouse": "ms-settings:mousetouchpad",
 }
 
 
@@ -439,3 +450,99 @@ def get_llm_info() -> ToolResult:
     }
     model = os.getenv(model_vars.get(provider, "ANTHROPIC_MODEL"), "default")
     return ToolResult(ok=True, output=f"Active LLM Provider: {provider}\nActive Model: {model}")
+
+
+@tool(
+    name="media_control",
+    description="Controls media playback across Windows (Spotify, YouTube, media players): play/pause, next track, previous track, or stop.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "action": {
+                "type": "string",
+                "enum": ["play_pause", "next", "previous", "stop"],
+                "description": "Media command: 'play_pause', 'next', 'previous', or 'stop'.",
+            }
+        },
+        "required": ["action"],
+    },
+    dangerous=False,
+    category="system",
+)
+def media_control(action: str) -> ToolResult:
+    """Sends Windows virtual media key events."""
+    import ctypes
+
+    key_map = {
+        "play_pause": 0xB3,  # VK_MEDIA_PLAY_PAUSE
+        "next": 0xB0,        # VK_MEDIA_NEXT_TRACK
+        "previous": 0xB1,    # VK_MEDIA_PREV_TRACK
+        "stop": 0xB2,        # VK_MEDIA_STOP
+    }
+    act = action.strip().lower()
+    vk_code = key_map.get(act)
+
+    if not vk_code:
+        return ToolResult(ok=False, output=f"Unknown media action '{action}'.")
+
+    try:
+        user32 = ctypes.windll.user32
+        # Key down then key up
+        user32.keybd_event(vk_code, 0, 0, 0)
+        user32.keybd_event(vk_code, 0, 2, 0)  # KEYEVENTF_KEYUP = 2
+        return ToolResult(ok=True, output=f"Triggered media action '{action}'.")
+    except Exception as e:
+        logger.error("Media key event failed: %s", e)
+        return ToolResult(ok=False, output=f"Failed to execute media action '{action}': {str(e)}")
+
+
+@tool(
+    name="get_network_info",
+    description="Returns active network interfaces, IP addresses, and tests internet connectivity.",
+    input_schema={"type": "object", "properties": {}},
+    dangerous=False,
+    category="system",
+)
+def get_network_info() -> ToolResult:
+    """Collects network adapters and tests internet connectivity."""
+    import socket
+
+    interfaces = psutil.net_if_addrs()
+    active_ips = []
+    for iface, addrs in interfaces.items():
+        for addr in addrs:
+            if addr.family == socket.AF_INET and not addr.address.startswith("127."):
+                active_ips.append(f"{iface}: {addr.address}")
+
+    # Check internet connectivity
+    connected = False
+    try:
+        sock = socket.create_connection(("1.1.1.1", 53), timeout=2.0)
+        sock.close()
+        connected = True
+    except Exception:
+        pass
+
+    conn_str = "Online (Connected to Internet)" if connected else "Offline (No Internet Connection)"
+    ip_list = "\n".join(f"- {ip}" for ip in active_ips) if active_ips else "No active IPv4 addresses"
+
+    return ToolResult(
+        ok=True,
+        output=f"Network Status: {conn_str}\n\nActive IP Addresses:\n{ip_list}",
+    )
+
+
+@tool(
+    name="cancel_shutdown",
+    description="Aborts and cancels any pending system shutdown or restart.",
+    input_schema={"type": "object", "properties": {}},
+    dangerous=False,
+    category="system",
+)
+def cancel_shutdown() -> ToolResult:
+    """Aborts Windows shutdown using shutdown /a."""
+    try:
+        subprocess.run(["shutdown", "/a"], check=True)
+        return ToolResult(ok=True, output="Pending system shutdown or restart has been cancelled.")
+    except Exception as e:
+        return ToolResult(ok=False, output=f"Could not cancel shutdown: {str(e)}")

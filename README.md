@@ -39,12 +39,42 @@ Jarvis is a voice-controlled personal AI assistant for Windows 11 that runs in t
 
 ---
 
+## Local AI Inference & Hardware Acceleration
+
+Jarvis is configured to run entirely local, privacy-first audio and voice processing with GPU acceleration:
+
+1. **Local Speech-to-Text (STT) via faster-whisper**:
+   - **Model**: `medium.en` (~1.4 GB, high accuracy English model).
+   - **Backend**: Auto-detects NVIDIA CUDA GPU via `ctranslate2` (`float16` precision) with automatic fallback to CPU (`int8` quantization).
+   - **Hardware Support**: Fully tested on NVIDIA GeForce RTX 3070 Laptop GPU (8GB VRAM).
+   - **Cloud Fallback**: Optional Groq Whisper API support if local inference is disabled or unavailable.
+
+2. **Local Neural Text-to-Speech (TTS) via Piper**:
+   - **Engine**: 100% offline neural TTS powered by Piper ONNX runtime (`piper-tts`).
+   - **Voice**: `en_GB-alan-medium` (~63 MB) — natural, confident, slightly futuristic British voice fitting the Jarvis persona.
+   - **Audio Quality**: 22,050 Hz high-fidelity synthesis streamed via `sounddevice`.
+   - **Configuration**: Configurable `speech_rate` (0.5x - 2.0x) and `volume` (0.0 - 1.0) in `config.yaml`.
+   - **Fallbacks**: Graceful multi-engine fallback to Edge-TTS (`en-GB-RyanNeural`) and Windows SAPI5 (`pyttsx3`).
+
+3. **Fully Customizable Wake Word**:
+   - **Built-in Models**: OpenWakeWord models (`hey_jarvis`, `alexa`, etc.) running on ONNX.
+   - **Arbitrary Custom Phrases**: Hybrid two-stage wake trigger combining WebRTC VAD speech segmentation with fast local Whisper phonetic verification. Set `wake_word_phrase: "hey bro"` or `"hello assistant"` in `config.yaml` with zero custom model training required!
+
+4. **Universal Application Resolver (`AppResolver`)**:
+   - Discovers applications installed anywhere across Windows 11, including applications **not in system `PATH`**.
+   - Scans Start Menu shortcuts (`.lnk`), Desktop shortcuts, Windows Registry `App Paths` (`HKLM` & `HKCU`), Windows `Uninstall` registries, and UWP apps.
+   - Caches discovered apps to `data/apps_cache.json` with background refresh and fuzzy name resolution.
+   - Handles disambiguation when multiple matching apps are found.
+
+---
+
 ## Quickstart & Installation
 
 ### 1. Requirements
 - Windows 11 (64-bit)
 - Python 3.11+
-- Virtual environment or system Python with dependencies installed:
+- NVIDIA GPU with CUDA drivers (optional, automatic CPU fallback provided)
+- Dependencies installed:
   ```powershell
   python -m pip install -r requirements.txt
   ```
@@ -62,15 +92,25 @@ GROQ_API_KEY=your_key_here
 ```
 > **Guidance on LLM Selection**: Small, fast models can be weak at multi-step PC control and tool-calling. For reliable desktop actions, use a strong tool-calling model (e.g. Claude Sonnet 3.5/3.7, Gemini 2.5 Flash / Pro, or Qwen 3.8 27B / Llama 3.3 70B).
 
+### 3. Local Voice & Model Setup
+Run the pre-flight setup check to verify your environment and automatically validate Piper TTS and local STT:
+```powershell
+python scripts/setup_check.py
+```
+To download or change Piper voices:
+1. Voices are stored in `data/piper_voices/`.
+2. The default model is `en_GB-alan-medium.onnx` and `en_GB-alan-medium.onnx.json` from [rhasspy/piper](https://github.com/rhasspy/piper).
+3. Update `audio.piper_model_path` in `config.yaml` to switch voices.
+
 ## Running Jarvis (Voice Mode)
 Launch the voice assistant:
 ```powershell
 python main.py
 ```
-- Say **"Hey Jarvis"** to wake the assistant.
+- Say **"Hey Jarvis"** (or your custom wake phrase from `config.yaml`) to wake the assistant.
 - You will hear a rising two-tone wake beep.
-- Speak your command (e.g. *"open calculator"* or *"search for flight tickets"*).
-- Jarvis records until natural silence, transcribes the speech, executes the tools, and speaks the confirmation aloud.
+- Speak your command (e.g. *"open discord"*, *"set volume to 40"*, *"play music"*).
+- Jarvis records until natural silence, transcribes the speech with local GPU STT, executes the tools, and speaks the confirmation aloud with Piper neural TTS.
 - Turnaround latency is measured and logged to `logs/jarvis.log` and the terminal.
 - Press **Ctrl+Alt+J** at any moment to immediately stop tasks and speech.
 

@@ -25,23 +25,30 @@ audio:
   vad_aggressiveness: 2       # 0-3
 
 wakeword:
-  engine: openwakeword
-  phrase: hey_jarvis
+  engine: openwakeword        # openwakeword | whisper_verifier
+  phrase: hey_jarvis          # built-in: hey_jarvis, alexa, hey_mycroft; or any custom phrase like 'hey bro'
   threshold: 0.5
   cooldown_seconds: 2
 
 stt:
+  provider: local             # local | groq
   engine: faster-whisper
-  model: small.en
-  device: cpu
-  compute_type: int8
+  model: medium.en            # medium.en (~1.5GB on GPU), small.en (~460MB), base.en (~140MB)
+  device: auto                # auto (detects cuda) | cuda | cpu
+  compute_type: auto          # auto (float16 on cuda, int8 on cpu) | float16 | int8
 
-tts:                          # engine + voice are chosen in .env (TTS_PROVIDER etc.)
-  fallback_engine: pyttsx3
+tts:
+  provider: piper             # piper (local offline neural) | edge (online neural) | pyttsx3 (SAPI5)
+  piper_voice: en_GB-alan-medium
+  speed: 1.0                  # speech rate multiplier (1.0 = normal)
+  fallback_engine: edge
   speak_replies: true
   max_spoken_sentences: 2     # longer answers are shown in the overlay, only a short version is spoken
   sentence_pause_ms: 180
   cache_dir: data/tts_cache
+
+web:
+  search_engine: google       # google | duckduckgo | bing | brave
 
 safety:
   confirm_dangerous: true

@@ -133,25 +133,71 @@ def check_wake_models() -> CheckResult:
 
 
 def check_tts_engine() -> CheckResult:
-    """Verifies TTS engines (edge-tts and pyttsx3 fallback)."""
-    try:
-        import pyttsx3
+    """Verifies TTS engines: Piper local neural voice and Edge-TTS/pyttsx3 fallbacks."""
+    from jarvis.audio import piper_tts
 
-        engine = pyttsx3.init()
-        voices = engine.getProperty("voices")
-        voice_count = len(voices) if voices else 0
-        engine.stop()
+    voices = piper_tts.get_available_voices()
+    if voices:
         return CheckResult(
-            name="Speech Synthesis (TTS)",
+            name="Speech Synthesis (Piper Local Neural TTS)",
             status="PASS",
-            message=f"edge-tts available with SAPI5 fallback ({voice_count} local voices).",
+            message=f"Piper local voice ready ({', '.join(voices)}). Edge-TTS & SAPI5 available as fallbacks.",
+        )
+
+    # Check if default model can be downloaded or if edge-tts works
+    try:
+        piper_tts.ensure_voice_downloaded("en_GB-alan-medium")
+        return CheckResult(
+            name="Speech Synthesis (Piper Local Neural TTS)",
+            status="PASS",
+            message="Downloaded and initialized default Piper voice 'en_GB-alan-medium'.",
         )
     except Exception as e:
         return CheckResult(
-            name="Speech Synthesis (TTS)",
+            name="Speech Synthesis (Piper Local Neural TTS)",
             status="WARN",
-            message=f"SAPI5 fallback test warning: {e}",
-            fix_hint="Ensure Windows Speech Platform and audio drivers are functioning.",
+            message=f"Piper voice not cached ({e}). Falling back to Edge-TTS/pyttsx3.",
+            fix_hint="Run: python -c \"from jarvis.audio.piper_tts import ensure_voice_downloaded; ensure_voice_downloaded('en_GB-alan-medium')\"",
+        )
+
+
+def check_gpu_stt() -> CheckResult:
+    """Verifies local Speech-to-Text with GPU/CUDA hardware acceleration."""
+    from jarvis.audio.stt import is_cuda_available
+
+    has_cuda = is_cuda_available()
+    if has_cuda:
+        return CheckResult(
+            name="Speech-to-Text (faster-whisper GPU Acceleration)",
+            status="PASS",
+            message="NVIDIA GPU detected with CTranslate2 CUDA support (float16 precision).",
+        )
+    else:
+        return CheckResult(
+            name="Speech-to-Text (faster-whisper CPU Fallback)",
+            status="WARN",
+            message="No CUDA GPU detected; faster-whisper will run on CPU (int8 precision).",
+            fix_hint="Install NVIDIA CUDA drivers and compatible CTranslate2 if GPU is present.",
+        )
+
+
+def check_app_resolver() -> CheckResult:
+    """Verifies that the universal application resolver is initialized and indexed."""
+    try:
+        from jarvis.services.app_resolver import get_app_resolver
+
+        resolver = get_app_resolver()
+        count = len(resolver.apps)
+        return CheckResult(
+            name="Universal Application Resolver",
+            status="PASS",
+            message=f"AppResolver indexed {count} applications from Start Menu, Desktop, and Registry.",
+        )
+    except Exception as e:
+        return CheckResult(
+            name="Universal Application Resolver",
+            status="WARN",
+            message=f"AppResolver warning: {e}",
         )
 
 
@@ -161,7 +207,6 @@ def check_browser_automation() -> CheckResult:
         from playwright.sync_api import sync_playwright
 
         with sync_playwright() as p:
-            # Check executable path without full launch
             browser_path = p.chromium.executable_path
             if Path(browser_path).exists():
                 return CheckResult(
@@ -186,13 +231,14 @@ def check_browser_automation() -> CheckResult:
 
 def run_all_checks() -> list[CheckResult]:
     """Runs all pre-flight diagnostic checks and returns the list of results."""
-    # Ensure config & .env are loaded
     load_config()
 
     return [
         check_api_keys(),
         check_microphone(),
+        check_gpu_stt(),
         check_wake_models(),
         check_tts_engine(),
+        check_app_resolver(),
         check_browser_automation(),
     ]

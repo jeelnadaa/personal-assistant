@@ -32,4 +32,13 @@
   - Named mutex single-instance lock (`Local\JarvisDesktopAssistantSingleInstanceMutex`)
   - Crash recovery supervisor with rate-limiting (max 3 restarts per hour)
   - Pre-flight diagnostic setup check script (`scripts/setup_check.py` and `main.py --check-setup`)
+- [x] **Local AI & Core Improvements**
+  - Documentation migration (`claude.md` -> `AGENTS.md`)
+  - High-quality local STT via faster-whisper with automatic CUDA GPU acceleration (`medium.en` on float16)
+  - Natural local neural TTS via Piper (`en_GB-alan-medium`, offline ONNX, 22050Hz, speed/volume controls)
+  - Universal application discovery (`AppResolver` scanning Start Menu, Desktops, Registry App Paths, Uninstall entries, UWP)
+  - Extended system tools (`media_control`, `get_network_info`, `cancel_shutdown`, expanded settings catalog)
+  - Extended web tools (phonetic spoken URL normalization, configurable search engines)
+  - Fully customizable wake words (OpenWakeWord built-ins + hybrid two-stage trigger for arbitrary phrases)
+  - Pre-flight diagnostics and comprehensive test suite (76 tests passing)
 
