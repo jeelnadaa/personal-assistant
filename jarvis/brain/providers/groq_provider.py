@@ -117,10 +117,13 @@ class GroqProvider(LLMProvider):
             for t in tools
         ]
 
+        # Cap max_tokens to 800 to avoid Groq 429 rate limit error (1000 OTPM on models like qwen/qwen3.8-27b)
+        safe_max_tokens = min(max_tokens, 800) if max_tokens else 800
+
         kwargs: dict[str, Any] = {
             "model": self.model,
             "messages": converted_messages,
-            "max_tokens": max_tokens,
+            "max_tokens": safe_max_tokens,
             "temperature": temperature,
         }
         if formatted_tools:

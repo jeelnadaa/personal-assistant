@@ -92,6 +92,7 @@ class ActivePopupCard(QWidget):
             | Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setFixedWidth(440)
 
         self._init_ui()
@@ -183,10 +184,12 @@ class ActivePopupCard(QWidget):
         close_item_layout.setSpacing(6)
         self.tag_esc = QLabel("Esc", self.close_item)
         self.tag_esc.setFixedHeight(18)
+        self.tag_esc.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.tag_esc.setStyleSheet(
             "border: 1px solid #5A5A5A; border-radius: 4px; padding: 1px 5px; color: #A8A8A8; font-size: 11px;"
         )
         self.lbl_close = QLabel("Close", self.close_item)
+        self.lbl_close.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.lbl_close.setStyleSheet("color: #A8A8A8; font-size: 12px;")
         close_item_layout.addWidget(self.tag_esc, alignment=Qt.AlignmentFlag.AlignVCenter)
         close_item_layout.addWidget(self.lbl_close, alignment=Qt.AlignmentFlag.AlignVCenter)
@@ -201,10 +204,12 @@ class ActivePopupCard(QWidget):
         copy_item_layout.setSpacing(6)
         self.tag_copy = QLabel("Ctrl C", self.copy_item)
         self.tag_copy.setFixedHeight(18)
+        self.tag_copy.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.tag_copy.setStyleSheet(
             "border: 1px solid #5A5A5A; border-radius: 4px; padding: 1px 5px; color: #A8A8A8; font-size: 11px;"
         )
         self.lbl_copy = QLabel("Copy", self.copy_item)
+        self.lbl_copy.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.lbl_copy.setStyleSheet("color: #A8A8A8; font-size: 12px;")
         copy_item_layout.addWidget(self.tag_copy, alignment=Qt.AlignmentFlag.AlignVCenter)
         copy_item_layout.addWidget(self.lbl_copy, alignment=Qt.AlignmentFlag.AlignVCenter)
@@ -254,10 +259,20 @@ class ActivePopupCard(QWidget):
     def _init_shortcuts(self) -> None:
         """Binds Esc to close and Ctrl+C to copy."""
         self.esc_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
+        self.esc_shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
         self.esc_shortcut.activated.connect(self.close_to_idle)
 
         self.copy_shortcut = QShortcut(QKeySequence(QKeySequence.StandardKey.Copy), self)
+        self.copy_shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
         self.copy_shortcut.activated.connect(self.copy_answer)
+
+        self.copy_ctrl_c = QShortcut(QKeySequence("Ctrl+C"), self)
+        self.copy_ctrl_c.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        self.copy_ctrl_c.activated.connect(self.copy_answer)
+
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
+        self.setFocus()
+        super().mousePressEvent(event)
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
         """Fallback keyPress handler ensuring Esc closes and Ctrl+C copies."""
@@ -302,6 +317,8 @@ class ActivePopupCard(QWidget):
             else:
                 self.ans_query_label.hide()
             self.answer_widget.show()
+            self.activateWindow()
+            self.setFocus()
 
         elif mode_upper in ("CONFIRM", "CONFIRMING"):
             self.confirm_detail.setText(text)
@@ -396,6 +413,7 @@ class JarvisOverlay(QWidget):
         )
 
         self.on_wake_handler = on_wake
+        self.on_close_handler: Callable[[], None] | None = None
         if self._show_idle_pill:
             self.idle_pill.show()
         else:
@@ -403,6 +421,9 @@ class JarvisOverlay(QWidget):
 
     def set_wake_handler(self, handler: Callable[[], None]) -> None:
         self.on_wake_handler = handler
+
+    def set_close_handler(self, handler: Callable[[], None]) -> None:
+        self.on_close_handler = handler
 
     def _on_pill_wake(self) -> None:
         """User clicked idle pill; starts listening."""
@@ -418,6 +439,11 @@ class JarvisOverlay(QWidget):
         if self._show_idle_pill:
             self.idle_pill.show()
             self.idle_pill.position_at_bottom_center()
+        if self.on_close_handler:
+            try:
+                self.on_close_handler()
+            except Exception as e:
+                logger.debug("Error in overlay on_close_handler: %s", e)
 
     def is_idle_pill_visible(self) -> bool:
         return self._show_idle_pill
@@ -477,6 +503,8 @@ class JarvisOverlay(QWidget):
             self.popup_card.set_mode(state_upper, text=message, query=self.last_query)
             self.popup_card.show()
             self.popup_card.raise_()
+            self.popup_card.activateWindow()
+            self.popup_card.setFocus()
 
     @Slot(str)
     def _on_confirm_request(self, description: str) -> None:

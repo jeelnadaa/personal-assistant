@@ -89,6 +89,17 @@ class JarvisApp:
         """Triggers wake listening cycle (e.g. from UI click or shortcut)."""
         self._on_wake_detected()
 
+    def dismiss_to_idle(self) -> None:
+        """Dismisses any active action/speech and resets state cleanly to IDLE."""
+        with self.state_lock:
+            self.turn_counter += 1
+        cancel_current_task()
+        stop_speech()
+        self.wake_detector.reset()
+        mic_stream.resume_wakeword()
+        self._set_state(AppState.IDLE)
+        logger.info("Jarvis dismissed to IDLE by user.")
+
     def _on_kill_switch(self) -> None:
         """Handles emergency kill switch (Ctrl+Alt+J)."""
         logger.warning("Emergency kill switch engaged in state: %s", self.state.value)

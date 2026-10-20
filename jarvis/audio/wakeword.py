@@ -54,7 +54,7 @@ class WakeWordDetector:
         self.threshold = float(os.getenv("WAKEWORD_THRESHOLD", ww_cfg.get("threshold", 0.6)))
         self.cooldown = float(ww_cfg.get("cooldown_seconds", 2.0))
         self.last_detection_time = 0.0
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._reset_requested = False
 
         # Determine engine mode: 'openwakeword' (for pre-trained/custom onnx) or 'whisper_verifier' (for arbitrary custom phrase)
@@ -167,6 +167,7 @@ class WakeWordDetector:
                     vad_accumulator.clear()
                     continue
 
+                should_trigger = False
                 # Mode A: openWakeWord built-in or custom ONNX
                 if self.mode in ("openwakeword", "custom_onnx") and self.model:
                     detected = False
@@ -184,6 +185,7 @@ class WakeWordDetector:
                                         self.last_detection_time = now
                                         logger.info("Wake word detected ('%s', score: %.3f)", model_name, score)
                                         detected = True
+                                        should_trigger = True
                                         sample_buffer.clear()
                                         vad_accumulator.clear()
                                         if hasattr(self.model, "reset"):
@@ -191,7 +193,6 @@ class WakeWordDetector:
                                                 self.model.reset()
                                             except Exception:
                                                 pass
-                                        self._trigger()
                                         break
                             if detected:
                                 break
@@ -225,10 +226,14 @@ class WakeWordDetector:
                                                 logger.info("Custom wake phrase verified: '%s'", phrase_text)
                                                 sample_buffer.clear()
                                                 vad_accumulator.clear()
-                                                self._trigger()
+                                                should_trigger = True
                                                 break
                                 except Exception as e:
                                     logger.debug("Hybrid wake verification error: %s", e)
+
+            # Fire detection callback outside of the lock
+            if should_trigger:
+                self._trigger()
 
     def _trigger(self) -> None:
         """Executes detection callback safely."""

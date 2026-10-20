@@ -1,13 +1,13 @@
 assistant_name: Jarvis
 
 llm:                          # provider + model names are NOT here, they live in .env
-  max_tokens: 1500
+  max_tokens: 800
   max_iterations: 25
   temperature: 0.2
   request_timeout_seconds: 60
 
 context:
-  recent_exchanges: 10        # how many past user/Jarvis exchanges to remember
+  recent_exchanges: 5         # how many past user/Jarvis exchanges to remember
   expire_minutes: 30          # after this much silence, start a fresh conversation (long-term memory stays)
   max_context_chars: 6000     # when exceeded, older exchanges get summarized
   auto_learn_facts: true      # extract durable user preferences after tasks
@@ -40,7 +40,7 @@ stt:
 tts:
   provider: edge              # edge (online neural cloud) | piper (local offline neural) | pyttsx3 (SAPI5)
   piper_voice: en_GB-alan-medium
-  speed: 1.0                  # speech rate multiplier (1.0 = normal)
+  speed: 1.15                 # speech rate multiplier (1.0 = normal, 1.15 = conversational)
   fallback_engine: edge
   speak_replies: true
   max_spoken_sentences: 2     # longer answers are shown in the overlay, only a short version is spoken

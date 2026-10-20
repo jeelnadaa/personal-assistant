@@ -54,7 +54,7 @@ def chat_with_retry(
         LLMResponse from provider.
     """
     llm_cfg = config.get("llm", {})
-    tokens = max_tokens or llm_cfg.get("max_tokens", 1500)
+    tokens = max_tokens or llm_cfg.get("max_tokens", 800)
     temp = temperature if temperature is not None else llm_cfg.get("temperature", 0.2)
 
     max_retries = 3
