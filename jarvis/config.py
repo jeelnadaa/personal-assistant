@@ -127,6 +127,12 @@ def load_config(config_path: Path | None = None) -> dict[str, Any]:
     if "WAKEWORD_PHRASE" in os.environ:
         config_dict.setdefault("wakeword", {})["phrase"] = os.getenv("WAKEWORD_PHRASE")
 
+    if "WAKEWORD_THRESHOLD" in os.environ:
+        try:
+            config_dict.setdefault("wakeword", {})["threshold"] = float(os.getenv("WAKEWORD_THRESHOLD", 0.6))
+        except ValueError:
+            pass
+
     if "SEARCH_ENGINE" in os.environ:
         config_dict.setdefault("browser", {})["search_engine"] = os.getenv("SEARCH_ENGINE")
 

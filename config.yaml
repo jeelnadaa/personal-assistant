@@ -27,7 +27,7 @@ audio:
 wakeword:
   engine: openwakeword        # openwakeword | whisper_verifier
   phrase: hey_jarvis          # built-in: hey_jarvis, alexa, hey_mycroft; or any custom phrase like 'hey bro'
-  threshold: 0.5
+  threshold: 0.6
   cooldown_seconds: 2
 
 stt:

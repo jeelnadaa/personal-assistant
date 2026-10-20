@@ -121,6 +121,9 @@ class JarvisApp:
             self.turn_counter += 1
             turn_id = self.turn_counter
 
+        # Reset wake detector internal state so it doesn't trigger on residual sound
+        self.wake_detector.reset()
+
         logger.info("Wake word detected! Entering LISTENING state (Turn #%d).", turn_id)
         # Start voice processing cycle in worker thread so detector stays responsive
         self.worker_thread = threading.Thread(
@@ -178,16 +181,21 @@ class JarvisApp:
         if audio_samples is None or len(audio_samples) == 0:
             logger.info("Empty audio recording. Returning to IDLE.")
             play_error_sound(block=True)
+            self.wake_detector.reset()
+            mic_stream.resume_wakeword()
             self._set_state(AppState.IDLE)
             return
 
-        # Resume wake word detection immediately so user can barge-in during thinking / tool execution
+        # Reset wake detector internal state so barge-in only triggers on new wake words
+        self.wake_detector.reset()
         mic_stream.resume_wakeword()
 
         self._set_state(AppState.PROCESSING, "Transcribing...")
         user_text = transcribe(audio_samples)
         if not user_text.strip():
             logger.info("Transcription yielded empty text. Returning to IDLE.")
+            self.wake_detector.reset()
+            mic_stream.resume_wakeword()
             self._set_state(AppState.IDLE)
             return
 
@@ -219,12 +227,14 @@ class JarvisApp:
 
         # Speak response (ensure wakeword remains active for barge-in)
         self._set_state(AppState.SPEAKING, reply, query=user_text)
+        self.wake_detector.reset()
         mic_stream.resume_wakeword()
         try:
             speak(reply, block=True)
             if turn_id == self.turn_counter and not is_task_cancelled():
                 play_done_sound(block=False)
         finally:
+            self.wake_detector.reset()
             mic_stream.resume_wakeword()
 
         if turn_id != self.turn_counter or is_task_cancelled():
@@ -237,6 +247,8 @@ class JarvisApp:
         else:
             with self.state_lock:
                 self.state = AppState.IDLE
+            self.wake_detector.reset()
+            mic_stream.resume_wakeword()
             logger.info("Jarvis turn complete. Answer card displayed; ready for wake word or Esc.")
 
     def start(self) -> None:

@@ -51,9 +51,11 @@ class WakeWordDetector:
         self.normalized_phrase = normalize_phrase(self.raw_phrase)
         self.custom_model_path = os.getenv("WAKEWORD_MODEL_PATH", ww_cfg.get("custom_model_path", ""))
 
-        self.threshold = float(os.getenv("WAKEWORD_THRESHOLD", ww_cfg.get("threshold", 0.5)))
+        self.threshold = float(os.getenv("WAKEWORD_THRESHOLD", ww_cfg.get("threshold", 0.6)))
         self.cooldown = float(ww_cfg.get("cooldown_seconds", 2.0))
         self.last_detection_time = 0.0
+        self._lock = threading.Lock()
+        self._reset_requested = False
 
         # Determine engine mode: 'openwakeword' (for pre-trained/custom onnx) or 'whisper_verifier' (for arbitrary custom phrase)
         self.builtin_key = OPENWAKEWORD_BUILTIN.get(self.normalized_phrase)
@@ -66,6 +68,23 @@ class WakeWordDetector:
 
         self.model = None
 
+    def reset(self) -> None:
+        """Resets detector internal buffers, clears mic queue, and resets model recurrent states."""
+        self._reset_requested = True
+        # Drain the mic wakeword queue immediately
+        while not mic_stream.wakeword_queue.empty():
+            try:
+                mic_stream.wakeword_queue.get_nowait()
+            except queue.Empty:
+                break
+        with self._lock:
+            if self.model and hasattr(self.model, "reset"):
+                try:
+                    self.model.reset()
+                except Exception as e:
+                    logger.debug("Error resetting openwakeword model recurrent state: %s", e)
+            self.last_detection_time = time.time()
+
     def reload_settings(self) -> None:
         """Reloads wake word settings from updated environment and configuration."""
         ww_cfg = config.get("wakeword", {})
@@ -73,7 +92,7 @@ class WakeWordDetector:
         self.raw_phrase = raw_phrase.strip()
         self.normalized_phrase = normalize_phrase(self.raw_phrase)
         self.custom_model_path = os.getenv("WAKEWORD_MODEL_PATH", ww_cfg.get("custom_model_path", ""))
-        self.threshold = float(os.getenv("WAKEWORD_THRESHOLD", ww_cfg.get("threshold", 0.5)))
+        self.threshold = float(os.getenv("WAKEWORD_THRESHOLD", ww_cfg.get("threshold", 0.6)))
         self.builtin_key = OPENWAKEWORD_BUILTIN.get(self.normalized_phrase)
 
         if self.custom_model_path and Path(self.custom_model_path).exists():
@@ -83,7 +102,8 @@ class WakeWordDetector:
         else:
             self.mode = "whisper_verifier"
 
-        self.model = None  # Recreated on next loop
+        with self._lock:
+            self.model = None  # Recreated on next loop
         logger.info(
             "WakeWordDetector reloaded: phrase='%s', mode=%s, threshold=%.2f",
             self.raw_phrase,
@@ -122,60 +142,93 @@ class WakeWordDetector:
         vad_accumulator = bytearray()
 
         while self.running:
+            with self._lock:
+                if self._reset_requested:
+                    self._reset_requested = False
+                    sample_buffer.clear()
+                    vad_accumulator.clear()
+                    if self.model and hasattr(self.model, "reset"):
+                        try:
+                            self.model.reset()
+                        except Exception:
+                            pass
+                    self.last_detection_time = time.time()
+
             try:
                 frame_bytes = mic_stream.wakeword_queue.get(timeout=0.1)
                 sample_buffer.extend(frame_bytes)
             except queue.Empty:
                 continue
 
-            # Mode A: openWakeWord built-in or custom ONNX
-            if self.mode in ("openwakeword", "custom_onnx") and self.model:
-                while len(sample_buffer) >= (CHUNK_SIZE * 2):
-                    chunk_bytes = bytes(sample_buffer[: CHUNK_SIZE * 2])
-                    del sample_buffer[: CHUNK_SIZE * 2]
+            with self._lock:
+                if self._reset_requested:
+                    self._reset_requested = False
+                    sample_buffer.clear()
+                    vad_accumulator.clear()
+                    continue
 
-                    audio_chunk = np.frombuffer(chunk_bytes, dtype=np.int16)
-                    try:
-                        prediction = self.model.predict(audio_chunk)
-                        for model_name, score in prediction.items():
-                            if score >= self.threshold:
-                                now = time.time()
-                                if now - self.last_detection_time >= self.cooldown:
-                                    self.last_detection_time = now
-                                    logger.info("Wake word detected ('%s', score: %.3f)", model_name, score)
-                                    self._trigger()
-                                    break
-                    except Exception as p_err:
-                        logger.error("Wake word prediction error: %s", p_err)
+                # Mode A: openWakeWord built-in or custom ONNX
+                if self.mode in ("openwakeword", "custom_onnx") and self.model:
+                    detected = False
+                    while len(sample_buffer) >= (CHUNK_SIZE * 2):
+                        chunk_bytes = bytes(sample_buffer[: CHUNK_SIZE * 2])
+                        del sample_buffer[: CHUNK_SIZE * 2]
 
-            # Mode B: Two-Stage Hybrid Verification for arbitrary phrases
-            elif self.mode == "whisper_verifier":
-                while len(sample_buffer) >= (CHUNK_SIZE * 2):
-                    chunk_bytes = bytes(sample_buffer[: CHUNK_SIZE * 2])
-                    del sample_buffer[: CHUNK_SIZE * 2]
-                    vad_accumulator.extend(chunk_bytes)
+                        audio_chunk = np.frombuffer(chunk_bytes, dtype=np.int16)
+                        try:
+                            prediction = self.model.predict(audio_chunk)
+                            for model_name, score in prediction.items():
+                                if score >= self.threshold:
+                                    now = time.time()
+                                    if now - self.last_detection_time >= self.cooldown:
+                                        self.last_detection_time = now
+                                        logger.info("Wake word detected ('%s', score: %.3f)", model_name, score)
+                                        detected = True
+                                        sample_buffer.clear()
+                                        vad_accumulator.clear()
+                                        if hasattr(self.model, "reset"):
+                                            try:
+                                                self.model.reset()
+                                            except Exception:
+                                                pass
+                                        self._trigger()
+                                        break
+                            if detected:
+                                break
+                        except Exception as p_err:
+                            logger.error("Wake word prediction error: %s", p_err)
 
-                    # When ~1.2s of speech is accumulated, verify with local whisper
-                    if len(vad_accumulator) >= (16000 * 2 * 1.2):
-                        raw_bytes = bytes(vad_accumulator)
-                        vad_accumulator.clear()
-                        audio_data = np.frombuffer(raw_bytes, dtype=np.int16)
+                # Mode B: Two-Stage Hybrid Verification for arbitrary phrases
+                elif self.mode == "whisper_verifier":
+                    while len(sample_buffer) >= (CHUNK_SIZE * 2):
+                        chunk_bytes = bytes(sample_buffer[: CHUNK_SIZE * 2])
+                        del sample_buffer[: CHUNK_SIZE * 2]
+                        vad_accumulator.extend(chunk_bytes)
 
-                        # Only transcribe if audio has sufficient energy
-                        if np.max(np.abs(audio_data)) > 700:
-                            try:
-                                from jarvis.audio.stt import transcribe
-                                phrase_text = transcribe(audio_data)
-                                if phrase_text:
-                                    norm_text = normalize_phrase(phrase_text)
-                                    if self.normalized_phrase in norm_text:
-                                        now = time.time()
-                                        if now - self.last_detection_time >= self.cooldown:
-                                            self.last_detection_time = now
-                                            logger.info("Custom wake phrase verified: '%s'", phrase_text)
-                                            self._trigger()
-                            except Exception as e:
-                                logger.debug("Hybrid wake verification error: %s", e)
+                        # When ~1.2s of speech is accumulated, verify with local whisper
+                        if len(vad_accumulator) >= (16000 * 2 * 1.2):
+                            raw_bytes = bytes(vad_accumulator)
+                            vad_accumulator.clear()
+                            audio_data = np.frombuffer(raw_bytes, dtype=np.int16)
+
+                            # Only transcribe if audio has sufficient energy
+                            if np.max(np.abs(audio_data)) > 700:
+                                try:
+                                    from jarvis.audio.stt import transcribe
+                                    phrase_text = transcribe(audio_data)
+                                    if phrase_text:
+                                        norm_text = normalize_phrase(phrase_text)
+                                        if self.normalized_phrase in norm_text:
+                                            now = time.time()
+                                            if now - self.last_detection_time >= self.cooldown:
+                                                self.last_detection_time = now
+                                                logger.info("Custom wake phrase verified: '%s'", phrase_text)
+                                                sample_buffer.clear()
+                                                vad_accumulator.clear()
+                                                self._trigger()
+                                                break
+                                except Exception as e:
+                                    logger.debug("Hybrid wake verification error: %s", e)
 
     def _trigger(self) -> None:
         """Executes detection callback safely."""

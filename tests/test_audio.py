@@ -207,3 +207,25 @@ def test_wake_turn_plays_greeting_and_supports_barge_in(monkeypatch):
     assert len(stopped_speech) >= 1  # Interrupted on speech start
 
 
+def test_wakeword_detector_reset():
+    """Verifies that WakeWordDetector.reset sets reset flag, clears queues, and resets model."""
+    from jarvis.audio.wakeword import WakeWordDetector
+    from jarvis.audio.mic import mic_stream
+
+    detector = WakeWordDetector()
+    mock_model = MagicMock()
+    mock_model.reset = MagicMock()
+    detector.model = mock_model
+
+    # Put a frame into the wakeword queue
+    mic_stream.wakeword_queue.put(b"\x00" * 256)
+    assert not mic_stream.wakeword_queue.empty()
+
+    detector.reset()
+
+    assert detector._reset_requested is True
+    assert mic_stream.wakeword_queue.empty()
+    mock_model.reset.assert_called_once()
+
+
+
