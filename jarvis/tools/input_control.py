@@ -223,7 +223,14 @@ def drag(x1: int, y1: int, x2: int, y2: int) -> ToolResult:
     category="input",
 )
 def wait(seconds: float) -> ToolResult:
-    """Waits for specified duration, capped at 10 seconds."""
+    """Waits for specified duration, capped at 10 seconds, responding promptly to cancellation."""
+    from jarvis.brain.agent import is_task_cancelled
+
     duration = max(0.0, min(10.0, float(seconds)))
-    time.sleep(duration)
+    start = time.perf_counter()
+    while time.perf_counter() - start < duration:
+        if is_task_cancelled():
+            return ToolResult(ok=False, output="Wait interrupted: task was cancelled.")
+        time.sleep(0.05)
     return ToolResult(ok=True, output=f"Waited {duration:.1f} second(s).")
+

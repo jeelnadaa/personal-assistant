@@ -15,7 +15,7 @@
 - [x] **Phase 3: Safety layer**
   - Policy enforcement (`policy.py`), interactive confirmation (`confirm.py`), audit log (`audit.py`)
   - Ctrl+Alt+J kill switch, loop prevention, max actions cap
-- [ ] **Phase 4: Voice**
+- [x] **Phase 4: Voice**
   - Audio pipeline: `mic.py`, `wakeword.py`, `stt.py`, `tts.py`, `sounds.py`
   - Integration with `app.py` state machine
   - `scripts/check_mic.py`

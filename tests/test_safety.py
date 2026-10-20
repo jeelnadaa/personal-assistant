@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 import pytest
 
+from jarvis.brain.agent import reset_cancel_event
 from jarvis.safety.audit import AUDIT_LOG_FILE, log_tool_execution
 from jarvis.safety.killswitch import start_killswitch, stop_killswitch
 from jarvis.safety.policy import _is_path_protected, requires_confirmation
@@ -140,3 +141,5 @@ def test_killswitch_cancels_mid_task():
         assert duration < 2.0  # Must abort in under 2 seconds
     finally:
         stop_killswitch()
+        reset_cancel_event()
+

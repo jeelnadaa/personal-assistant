@@ -206,14 +206,19 @@ def main() -> None:
             stop_killswitch()
         return
 
-    # In Phase 1 & 2, default without arguments or with --text enters text mode
-    print("Voice mode will be integrated in Phase 4. Defaulting to text mode...")
+    # Voice mode
+    from jarvis.app import JarvisApp
+
     validate_env()
-    start_killswitch()
+    app = JarvisApp()
     try:
-        run_text_repl()
+        app.start()
+        while True:
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        print("\nStopping Jarvis...")
     finally:
-        stop_killswitch()
+        app.stop()
 
 
 if __name__ == "__main__":

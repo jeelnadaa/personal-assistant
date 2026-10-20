@@ -159,13 +159,14 @@ def close_app(name: str) -> ToolResult:
 
     # Close top-level windows matching name
     if win32gui and win32con:
-        def enum_cb(hwnd: int, extra: Any) -> None:
+        def enum_cb(hwnd: int, extra: Any) -> bool:
             nonlocal closed_any
             if win32gui.IsWindowVisible(hwnd):
                 title = win32gui.GetWindowText(hwnd).lower()
                 if clean_name in title:
                     win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
                     closed_any = True
+            return True
 
         try:
             win32gui.EnumWindows(enum_cb, None)
@@ -211,11 +212,12 @@ def list_running_apps() -> ToolResult:
 
     windows: list[str] = []
 
-    def enum_cb(hwnd: int, extra: Any) -> None:
+    def enum_cb(hwnd: int, extra: Any) -> bool:
         if win32gui.IsWindowVisible(hwnd):
             title = win32gui.GetWindowText(hwnd).strip()
             if title and title not in ("Program Manager", "Default IME", "MSCTFIME UI"):
                 windows.append(title)
+        return True
 
     win32gui.EnumWindows(enum_cb, None)
     if not windows:

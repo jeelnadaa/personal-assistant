@@ -26,13 +26,17 @@ def _find_window_by_title(title_contains: str) -> tuple[int, str] | None:
     clean_target = title_contains.strip().lower()
     matches: list[tuple[int, str]] = []
 
-    def enum_cb(hwnd: int, extra: Any) -> None:
+    def enum_cb(hwnd: int, extra: Any) -> bool:
         if win32gui.IsWindowVisible(hwnd):
             text = win32gui.GetWindowText(hwnd).strip()
             if text and clean_target in text.lower():
                 matches.append((hwnd, text))
+        return True
 
-    win32gui.EnumWindows(enum_cb, None)
+    try:
+        win32gui.EnumWindows(enum_cb, 0)
+    except Exception as exc:
+        logger.warning("EnumWindows error in _find_window_by_title: %s", exc)
     if not matches:
         return None
 
@@ -55,13 +59,17 @@ def list_windows() -> ToolResult:
 
     results: list[str] = []
 
-    def enum_cb(hwnd: int, extra: Any) -> None:
+    def enum_cb(hwnd: int, extra: Any) -> bool:
         if win32gui.IsWindowVisible(hwnd):
             text = win32gui.GetWindowText(hwnd).strip()
             if text and text not in ("Program Manager", "Default IME", "MSCTFIME UI"):
                 results.append(f"HWND {hwnd}: {text}")
+        return True
 
-    win32gui.EnumWindows(enum_cb, None)
+    try:
+        win32gui.EnumWindows(enum_cb, 0)
+    except Exception as exc:
+        logger.warning("EnumWindows error in list_windows: %s", exc)
     if not results:
         return ToolResult(ok=True, output="No visible windows found.")
 

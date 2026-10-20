@@ -4,12 +4,13 @@ Jarvis is a voice-controlled personal AI assistant for Windows 11 that runs in t
 
 ---
 
-## Current Status (Phase 3: Safety Layer)
+## Current Status (Phase 4: Voice Pipeline)
 
 - **Completed Phases**:
   - **Phase 1: Skeleton + Text Brain** (Foundation, LLM adapters, CLI, test loop)
   - **Phase 2: Full Tool Set** (Complete system automation tools)
   - **Phase 3: Safety Layer** (Policy enforcement, user confirmation prompts, audit logging, Ctrl+Alt+J global kill switch)
+  - **Phase 4: Voice Pipeline** (OpenWakeWord, 16kHz mic stream with VAD, Groq/faster-whisper STT, Edge-TTS/pyttsx3 TTS, state machine)
 
 ---
 
@@ -50,6 +51,24 @@ GROQ_MODEL=qwen/qwen3.8-27b
 GROQ_API_KEY=your_key_here
 ```
 > **Guidance on LLM Selection**: Small, fast models can be weak at multi-step PC control and tool-calling. For reliable desktop actions, use a strong tool-calling model (e.g. Claude Sonnet 3.5/3.7, Gemini 2.5 Flash / Pro, or Qwen 3.8 27B / Llama 3.3 70B).
+
+## Running Jarvis (Voice Mode)
+Launch the voice assistant:
+```powershell
+python main.py
+```
+- Say **"Hey Jarvis"** to wake the assistant.
+- You will hear a rising two-tone wake beep.
+- Speak your command (e.g. *"open calculator"* or *"search for flight tickets"*).
+- Jarvis records until natural silence, transcribes the speech, executes the tools, and speaks the confirmation aloud.
+- Turnaround latency is measured and logged to `logs/jarvis.log` and the terminal.
+- Press **Ctrl+Alt+J** at any moment to immediately stop tasks and speech.
+
+### Testing Audio Hardware & Microphone
+To verify input devices, volume sensitivity, and playback:
+```powershell
+python scripts/check_mic.py
+```
 
 ---
 

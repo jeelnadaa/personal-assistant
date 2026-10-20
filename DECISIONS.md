@@ -22,3 +22,14 @@
 - **Global Kill Switch (Ctrl+Alt+J)**: Implemented in `jarvis/safety/killswitch.py` using Windows `user32.RegisterHotKey` (ID 0x4A01, MOD_CONTROL | MOD_ALT, VK_J) and a daemon message queue thread. When triggered, sets `TASK_CANCEL_EVENT` to abort active tool iterations and agent thinking within milliseconds (< 2s).
 - **Confirmation Precedence**: In `jarvis/safety/policy.py`, checks for allowed shell commands and safe application names take precedence over base dangerous flags so trusted safe actions run without friction while untrusted commands always prompt.
 - **Interactive & Headless Fallbacks**: `jarvis/safety/confirm.py` supports pluggable custom confirmation handlers (voice/GUI) with fallback to terminal console `[y/N]` prompt.
+
+## Phase 4 Decisions
+- **Audio Capture & VAD**: Standardized mic stream on 16kHz mono int16 with 30ms frames in `jarvis/audio/mic.py`. Used `webrtcvad` for silence detection with a 1.2s silence threshold and 6.0s speech timeout.
+- **Dual-Engine Wake Word**: Implemented `WakeWordDetector` in `jarvis/audio/wakeword.py` using `openwakeword` with local ONNX model caching. Includes thread-safe pause/resume so wake detection is paused during recording and speaking to prevent feedback.
+- **STT Fast Path & Local Fallback**: In `jarvis/audio/stt.py`, requests route to Groq Whisper (`whisper-large-v3-turbo`) for fast transcription, falling back to local `faster-whisper` (`small.en`) if network or credentials are unavailable.
+- **TTS Pipeline & Text Sanitization**: In `jarvis/audio/tts.py`, speech is synthesized via `edge-tts` with miniaudio PCM decode, with automatic offline fallback to Windows SAPI5 (`pyttsx3`). Text is cleaned to remove markdown asterisks, backticks, URLs, and formatting before speech.
+- **Synthesized UI Sounds**: `jarvis/audio/sounds.py` uses NumPy sine wave synthesis for wake (rising two-tone), done (soft chime), and error (low tone) beeps without requiring external audio asset files.
+- **Turnaround Latency Measurement**: Logged exact turnaround time from end-of-speech to start-of-reply in `logs/jarvis.log` and console.
+- **Responsive Waiting**: `wait` tool polls `is_task_cancelled()` in 50ms intervals so global kill switch (Ctrl+Alt+J) aborts immediately.
+- **EnumWindows Compatibility**: Handled 64-bit Windows LPARAM conversion in `windows_mgmt.py` and `apps.py` by returning `True` from enum callbacks and passing integer `0`.
+

@@ -3,7 +3,7 @@
 from typing import Any
 import pytest
 
-from jarvis.brain.agent import cancel_current_task, run_task
+from jarvis.brain.agent import cancel_current_task, reset_cancel_event, run_task
 from jarvis.brain.providers.base import (
     LLMProvider,
     LLMResponse,
@@ -110,3 +110,5 @@ def test_agent_loop_kill_switch():
         provider=fake_provider2,
     )
     assert "stopped" in reply2
+    reset_cancel_event()
+
