@@ -106,8 +106,11 @@ class MicrophoneStream:
                 break
         self.wakeword_paused = False
 
-    def record_until_silence(self) -> np.ndarray:
+    def record_until_silence(self, on_speech_start: Any = None) -> np.ndarray:
         """Waits for user speech to start (up to 6s) and records until silence or max limit.
+
+        Args:
+            on_speech_start: Optional callback triggered immediately when user speech begins.
 
         Returns:
             1D numpy array of int16 samples or empty array if no speech detected.
@@ -135,6 +138,7 @@ class MicrophoneStream:
 
         recorded_frames: list[bytes] = []
         speech_started = False
+        consecutive_speech = 0
         consecutive_silence = 0
         wait_start_time = time.time()
 
@@ -150,14 +154,25 @@ class MicrophoneStream:
                 except queue.Empty:
                     continue
 
-                is_speech = self.vad.is_speech(frame_bytes, SAMPLE_RATE)
+                frame_arr = np.frombuffer(frame_bytes, dtype=np.int16)
+                rms = float(np.sqrt(np.mean(frame_arr.astype(np.float32) ** 2))) if len(frame_arr) > 0 else 0.0
+                is_speech = self.vad.is_speech(frame_bytes, SAMPLE_RATE) and (rms > 80.0)
 
                 if not speech_started:
                     pre_buffer.append(frame_bytes)
                     if is_speech:
-                        speech_started = True
-                        recorded_frames.extend(pre_buffer)
-                        logger.info("Speech detected, recording command...")
+                        consecutive_speech += 1
+                        if consecutive_speech >= 2:
+                            speech_started = True
+                            recorded_frames.extend(pre_buffer)
+                            logger.info("Speech detected, recording command...")
+                            if on_speech_start:
+                                try:
+                                    on_speech_start()
+                                except Exception as cb_err:
+                                    logger.debug("on_speech_start callback exception: %s", cb_err)
+                    else:
+                        consecutive_speech = 0
                 else:
                     recorded_frames.append(frame_bytes)
                     if not is_speech:

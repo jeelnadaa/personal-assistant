@@ -69,7 +69,7 @@ async def _generate_edge_tts_mp3(text: str, voice: str, rate: str, pitch: str, o
 def _speak_with_piper(text: str, block: bool) -> bool:
     """Synthesizes and plays speech using local offline Piper neural voice."""
     tts_cfg = config.get("tts", {})
-    voice = os.getenv("PIPER_VOICE", tts_cfg.get("piper_voice", "en_GB-alan-medium"))
+    voice = os.getenv("TTS_PIPER_VOICE") or os.getenv("PIPER_VOICE", tts_cfg.get("piper_voice", "en_GB-alan-medium"))
     speed = float(os.getenv("TTS_SPEED", tts_cfg.get("speed", 1.0)))
 
     try:
@@ -162,7 +162,7 @@ def get_tts_info() -> dict[str, Any]:
     provider = os.getenv("TTS_PROVIDER", config.get("tts", {}).get("provider", "piper")).strip().lower()
     return {
         "provider": provider,
-        "piper_voice": os.getenv("PIPER_VOICE", "en_GB-alan-medium"),
+        "piper_voice": os.getenv("TTS_PIPER_VOICE") or os.getenv("PIPER_VOICE", "en_GB-alan-medium"),
         "edge_voice": os.getenv("TTS_EDGE_VOICE", "en-GB-RyanNeural"),
         "available_piper_voices": piper_tts.get_available_voices(),
     }

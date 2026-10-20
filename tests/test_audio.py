@@ -91,7 +91,7 @@ def test_app_voice_turn_flow(monkeypatch):
 
     # Mock audio pipeline steps
     mock_audio = np.ones(16000, dtype=np.int16)
-    monkeypatch.setattr("jarvis.app.mic_stream.record_until_silence", lambda: mock_audio)
+    monkeypatch.setattr("jarvis.app.mic_stream.record_until_silence", lambda on_speech_start=None: mock_audio)
     monkeypatch.setattr("jarvis.app.play_wake_sound", lambda block=True: None)
     monkeypatch.setattr("jarvis.app.play_done_sound", lambda block=False: None)
     monkeypatch.setattr("jarvis.app.transcribe", lambda samples: "open calculator")
@@ -152,4 +152,58 @@ def test_tts_cloud_provider(monkeypatch):
     speak("Testing cloud speech", block=True)
     assert len(edge_called) == 1
     assert "Testing cloud speech" in edge_called[0]
+
+
+def test_wake_greetings_formatting(monkeypatch):
+    """Verifies wake greetings are generated with user honorific or fallback casually."""
+    from jarvis.audio.greetings import get_wake_greeting
+
+    monkeypatch.setenv("HONORIFIC", "sir")
+    for _ in range(10):
+        g = get_wake_greeting()
+        assert "sir" in g
+
+    monkeypatch.setenv("HONORIFIC", "boss")
+    for _ in range(10):
+        g = get_wake_greeting()
+        assert "boss" in g
+
+    monkeypatch.setenv("HONORIFIC", "")
+    monkeypatch.setenv("USER_NAME", "Tony")
+    for _ in range(10):
+        g = get_wake_greeting()
+        assert "Tony" in g
+
+    monkeypatch.setenv("USER_NAME", "")
+    g_casual = get_wake_greeting()
+    assert len(g_casual) > 0
+
+
+def test_wake_turn_plays_greeting_and_supports_barge_in(monkeypatch):
+    """Verifies that _process_voice_turn starts greeting and interrupts it when speech starts."""
+    from jarvis.app import JarvisApp, AppState
+
+    greetings_played = []
+    stopped_speech = []
+
+    monkeypatch.setattr("jarvis.app.play_wake_greeting", lambda text, block=True: greetings_played.append(text) or True)
+    monkeypatch.setattr("jarvis.app.stop_speech", lambda: stopped_speech.append(True))
+    monkeypatch.setattr("jarvis.app.transcribe", lambda samples: "hello jarvis")
+    monkeypatch.setattr("jarvis.app.run_task", lambda text, ui_callback=None: "At your command, sir.")
+    monkeypatch.setattr("jarvis.app.speak", lambda text, block=True: True)
+
+    def fake_record(on_speech_start=None):
+        if on_speech_start:
+            on_speech_start()
+        import numpy as np
+        return np.ones(1600, dtype=np.int16)
+
+    monkeypatch.setattr("jarvis.app.mic_stream.record_until_silence", fake_record)
+
+    app = JarvisApp()
+    app._process_voice_turn(turn_id=1, is_followup=False)
+
+    assert len(greetings_played) == 1
+    assert len(stopped_speech) >= 1  # Interrupted on speech start
+
 

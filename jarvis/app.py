@@ -5,6 +5,7 @@ import threading
 import time
 from typing import Callable
 
+from jarvis.audio.greetings import get_wake_greeting, play_wake_greeting, warmup_wake_greetings
 from jarvis.audio.mic import mic_stream
 from jarvis.audio.sounds import play_done_sound, play_error_sound, play_wake_sound
 from jarvis.audio.stt import transcribe
@@ -132,9 +133,33 @@ class JarvisApp:
         self._set_state(AppState.LISTENING, "Listening...")
 
         if not is_followup:
-            play_wake_sound(block=False)
+            greeting = get_wake_greeting()
+            self._set_state(AppState.LISTENING, greeting)
 
-        audio_samples = mic_stream.record_until_silence()
+            def _play_greeting() -> None:
+                try:
+                    play_wake_greeting(greeting, block=True)
+                except Exception as e:
+                    logger.debug("Wake greeting playback failed: %s", e)
+
+            greeting_thread = threading.Thread(
+                target=_play_greeting,
+                daemon=True,
+                name=f"WakeGreetingPlayback-{turn_id}",
+            )
+            greeting_thread.start()
+
+            def _on_speech_started() -> None:
+                logger.info("User speech detected during greeting; interrupting greeting playback immediately.")
+                stop_speech()
+                if turn_id == self.turn_counter and not is_task_cancelled():
+                    self._set_state(AppState.LISTENING, "Listening...")
+
+            audio_samples = mic_stream.record_until_silence(on_speech_start=_on_speech_started)
+            stop_speech()  # Ensure greeting audio is silenced when recording finishes
+        else:
+            audio_samples = mic_stream.record_until_silence()
+
         end_of_speech_time = time.perf_counter()
 
         # Check if cancelled or superseded during recording
@@ -213,6 +238,7 @@ class JarvisApp:
         mic_stream.start()
         start_killswitch()
         self.wake_detector.start()
+        warmup_wake_greetings()
         if self.tray:
             try:
                 self.tray.start()

@@ -32,8 +32,16 @@ def _resolve_stt_backend() -> tuple[str, str, str]:
     """Resolves model size, compute device, and precision based on hardware and configuration."""
     stt_cfg = config.get("stt", {})
 
-    model_size = os.getenv("STT_MODEL", stt_cfg.get("model", "medium.en")).strip()
-    configured_device = os.getenv("STT_DEVICE", stt_cfg.get("device", "auto")).strip().lower()
+    model_size = (
+        os.getenv("STT_LOCAL_MODEL")
+        or os.getenv("STT_MODEL")
+        or stt_cfg.get("model", "medium.en")
+    ).strip()
+    configured_device = (
+        os.getenv("STT_LOCAL_DEVICE")
+        or os.getenv("STT_DEVICE")
+        or stt_cfg.get("device", "auto")
+    ).strip().lower()
     configured_compute = os.getenv("STT_COMPUTE_TYPE", stt_cfg.get("compute_type", "auto")).strip().lower()
 
     if configured_device == "auto":
@@ -179,7 +187,7 @@ def transcribe(audio: np.ndarray, sample_rate: int = 16000) -> str:
 
             client = Groq()
             wav_buf = _audio_to_wav_bytes(audio, sample_rate)
-            model_name = os.getenv("GROQ_STT_MODEL", "whisper-large-v3-turbo")
+            model_name = os.getenv("STT_GROQ_MODEL") or os.getenv("GROQ_STT_MODEL", "whisper-large-v3-turbo")
 
             resp = client.audio.transcriptions.create(
                 file=wav_buf,

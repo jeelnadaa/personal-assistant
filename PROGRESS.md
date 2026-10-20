@@ -40,5 +40,12 @@
   - Extended system tools (`media_control`, `get_network_info`, `cancel_shutdown`, expanded settings catalog)
   - Extended web tools (phonetic spoken URL normalization, configurable search engines)
   - Fully customizable wake words (OpenWakeWord built-ins + hybrid two-stage trigger for arbitrary phrases)
-  - Pre-flight diagnostics and comprehensive test suite (76 tests passing)
-
+- [x] **Phase 9: Standalone Executable, Cloud TTS & Interactive Enhancements**
+  - Standalone single-file binary packaging via PyInstaller (`scripts/build_exe.py` -> `dist/jarvis.exe`)
+  - Cloud neural TTS via Microsoft Edge (`edge-tts` 7.3.1, British `en-GB-RyanNeural`, offline fallbacks)
+  - Enforced user persona and honorific (`HONORIFIC=sir`) across agent loop and prompt templates
+  - Wake-up spoken greeting generation (`jarvis/audio/greetings.py`) with 7 natural lines tailored to user honorific
+  - Wake greeting speech interruption / barge-in (`mic_stream.record_until_silence(on_speech_start=stop_speech)`)
+  - Wake word task cancellation during thinking, execution, or speech playback
+  - Clean structured `.env` configuration schema grouped by task, provider, and credentials
+  - 91 tests passing across test suite

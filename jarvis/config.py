@@ -94,19 +94,29 @@ def load_config(config_path: Path | None = None) -> dict[str, Any]:
     if "STT_PROVIDER" in os.environ:
         config_dict.setdefault("stt", {})["provider"] = os.getenv("STT_PROVIDER")
 
-    if "STT_MODEL" in os.environ:
-        config_dict.setdefault("stt", {})["local_model"] = os.getenv("STT_MODEL")
+    stt_model = os.getenv("STT_LOCAL_MODEL") or os.getenv("STT_MODEL")
+    if stt_model:
+        config_dict.setdefault("stt", {})["local_model"] = stt_model
 
-    if "STT_DEVICE" in os.environ:
-        config_dict.setdefault("stt", {})["device"] = os.getenv("STT_DEVICE")
+    stt_device = os.getenv("STT_LOCAL_DEVICE") or os.getenv("STT_DEVICE")
+    if stt_device:
+        config_dict.setdefault("stt", {})["device"] = stt_device
+
+    stt_compute = os.getenv("STT_COMPUTE_TYPE")
+    if stt_compute:
+        config_dict.setdefault("stt", {})["compute_type"] = stt_compute
+
+    stt_groq_model = os.getenv("STT_GROQ_MODEL") or os.getenv("GROQ_STT_MODEL")
+    if stt_groq_model:
+        config_dict.setdefault("stt", {})["groq_model"] = stt_groq_model
 
     if "TTS_PROVIDER" in os.environ:
         config_dict.setdefault("tts", {})["engine"] = os.getenv("TTS_PROVIDER")
 
-    if "PIPER_VOICE" in os.environ:
-        voice_name = os.getenv("PIPER_VOICE", "")
-        if voice_name:
-            config_dict.setdefault("tts", {})["piper_model_path"] = f"data/piper_voices/{voice_name}.onnx"
+    piper_voice = os.getenv("TTS_PIPER_VOICE") or os.getenv("PIPER_VOICE")
+    if piper_voice:
+        config_dict.setdefault("tts", {})["piper_model_path"] = f"data/piper_voices/{piper_voice}.onnx"
+        config_dict.setdefault("tts", {})["piper_voice"] = piper_voice
 
     if "TTS_SPEED" in os.environ:
         try:
@@ -145,6 +155,7 @@ def get_config_summary() -> dict[str, Any]:
         os.getenv(f"{provider.upper()}_MODEL")
         or config.get("llm", {}).get("model", "")
     )
+    tts_engine = os.getenv("TTS_PROVIDER", config.get("tts", {}).get("engine", "edge"))
     return {
         "base_dir": str(BASE_DIR),
         "config_file": str(BASE_DIR / "config.yaml"),
@@ -153,13 +164,21 @@ def get_config_summary() -> dict[str, Any]:
         "env_file_exists": (BASE_DIR / ".env").exists(),
         "llm_provider": provider,
         "llm_model": model,
-        "stt_provider": config.get("stt", {}).get("provider", "local"),
-        "stt_model": config.get("stt", {}).get("local_model", "medium.en"),
-        "stt_device": config.get("stt", {}).get("device", "auto"),
-        "tts_engine": config.get("tts", {}).get("engine", "piper"),
-        "tts_speed": config.get("tts", {}).get("speech_rate", 1.0),
-        "wakeword_phrase": config.get("wakeword", {}).get("phrase", "hey_jarvis"),
-        "search_engine": config.get("browser", {}).get("search_engine", "google"),
+        "stt_provider": os.getenv("STT_PROVIDER", config.get("stt", {}).get("provider", "local")),
+        "stt_model": (
+            os.getenv("STT_LOCAL_MODEL")
+            or os.getenv("STT_MODEL")
+            or config.get("stt", {}).get("local_model", "medium.en")
+        ),
+        "stt_device": (
+            os.getenv("STT_LOCAL_DEVICE")
+            or os.getenv("STT_DEVICE")
+            or config.get("stt", {}).get("device", "auto")
+        ),
+        "tts_engine": tts_engine,
+        "tts_speed": float(os.getenv("TTS_SPEED", config.get("tts", {}).get("speech_rate", 1.0))),
+        "wakeword_phrase": os.getenv("WAKEWORD_PHRASE", config.get("wakeword", {}).get("phrase", "hey_jarvis")),
+        "search_engine": os.getenv("SEARCH_ENGINE", config.get("browser", {}).get("search_engine", "google")),
     }
 
 
