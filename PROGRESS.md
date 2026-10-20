@@ -9,7 +9,7 @@
   - `brain/agent.py` and `brain/prompts.py`
   - CLI in `main.py` using `--text` mode
   - Tests: `tests/test_tools.py`, `tests/test_agent_loop.py`
-- [ ] **Phase 2: Full tool set**
+- [x] **Phase 2: Full tool set**
   - Implement apps, windows_mgmt, system, files, web, input_control, screen basics, clipboard, shell, memory_tools
   - Comprehensive unit tests
 - [ ] **Phase 3: Safety layer**

@@ -4,17 +4,23 @@ Jarvis is a voice-controlled personal AI assistant for Windows 11 that runs in t
 
 ---
 
-## Current Status (Phase 1: Skeleton + Text Brain)
+## Current Status (Phase 2: Full Tool Set)
 
-- **Completed**:
-  - Full modular project structure
-  - Dynamic tool registry with `@tool` decorator
-  - Phase 1 core tools: `open_app`, `get_system_info`, `open_url`
-  - Multi-provider LLM abstraction layer (`anthropic`, `gemini`, `groq`)
-  - Agent decision and tool-calling execution loop with cancellation, audit logging, and infinite loop protection
-  - CLI text mode (`python main.py --text`)
-  - Provider self-test command (`python main.py --test-provider`)
-  - Unit test suite for tools, loop, and provider conversions
+- **Completed Phases**:
+  - **Phase 1: Skeleton + Text Brain** (Foundation, LLM adapters, CLI, test loop)
+  - **Phase 2: Full Tool Set** (Complete system automation tools)
+
+### Available Tools:
+- **Applications (`apps.py`)**: `open_app`, `close_app`, `list_running_apps`
+- **Window Management (`windows_mgmt.py`)**: `list_windows`, `focus_window`, `minimize_window`, `maximize_window`, `snap_window` (left, right, fullscreen), `get_active_window`
+- **System Controls (`system.py`)**: `set_volume`, `get_volume`, `mute`, `set_brightness`, `get_brightness`, `get_system_info`, `lock_screen`, `shutdown_pc`, `toggle_wifi`, `toggle_bluetooth`, `open_settings_page`, `switch_llm_provider`, `get_llm_info`
+- **File System (`files.py`)**: `search_files`, `read_text_file`, `write_text_file`, `list_folder`, `open_file`, `move_file`, `copy_file`, `delete_file` (via Recycle Bin), `create_folder`
+- **Web & Search (`web.py`)**: `open_url`, `web_search`, `browser_get_page_text`
+- **Mouse & Keyboard (`input_control.py`)**: `type_text`, `press_key`, `hotkey`, `click`, `move_mouse`, `scroll`, `drag`, `wait`
+- **Screen & Vision (`screen.py`)**: `take_screenshot`, `get_screen_size`, `get_ui_elements`, `click_ui_element`, `read_screen_text`, `find_and_click`
+- **Clipboard (`clipboard.py`)**: `get_clipboard`, `set_clipboard`
+- **Shell (`shell.py`)**: `run_command` (PowerShell / Command Prompt)
+- **Long-term Memory (`memory_tools.py`)**: `remember`, `recall`, `forget`
 
 ---
 
@@ -35,27 +41,34 @@ copy .env.example .env
 ```
 Open `.env` and set your active provider and API key:
 ```ini
-LLM_PROVIDER=anthropic
-ANTHROPIC_MODEL=claude-sonnet-5-5
-ANTHROPIC_API_KEY=your_key_here
+LLM_PROVIDER=groq
+GROQ_MODEL=qwen/qwen3.8-27b
+GROQ_API_KEY=your_key_here
 ```
-> **Guidance on LLM Selection**: Small, fast models can be weak at multi-step PC control and tool-calling. For reliable desktop actions, use a strong tool-calling model (e.g. Claude Sonnet 3.5/3.7, Gemini 2.5 Flash / Pro, or Llama 3.3 70B).
+> **Guidance on LLM Selection**: Small, fast models can be weak at multi-step PC control and tool-calling. For reliable desktop actions, use a strong tool-calling model (e.g. Claude Sonnet 3.5/3.7, Gemini 2.5 Flash / Pro, or Qwen 3.8 27B / Llama 3.3 70B).
 
 ---
 
-## Running Jarvis (Phase 1)
+## Running Jarvis (Text Mode)
 
-### Text Mode (Interactive)
+### Interactive Console
 ```powershell
 python main.py --text
 ```
 
-### Text Mode (Single Command)
+### Direct Automation Commands
 ```powershell
-python main.py --text "what time is it and how much battery do I have"
-```
-```powershell
-python main.py --text "open notepad"
+# Adjust master volume
+python main.py --text "set volume to 30"
+
+# Web search
+python main.py --text "open chrome and search for python tutorials"
+
+# File search
+python main.py --text "find files named resume in my documents"
+
+# Window positioning
+python main.py --text "snap notepad to the left"
 ```
 
 ### Run Active Provider Self-Test

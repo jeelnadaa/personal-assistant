@@ -1,4 +1,7 @@
-"""System control and information tools for Windows 11."""
+"""System control and information tools for Windows 11.
+
+Includes volume, brightness, power state, network settings, and hardware metrics.
+"""
 
 from datetime import datetime
 import os
@@ -7,8 +10,18 @@ import subprocess
 from typing import Any
 import psutil
 
-from jarvis.tools.base import tool, ToolResult
+try:
+    from pycaw.pycaw import AudioUtilities
+except ImportError:
+    AudioUtilities = None
+
+try:
+    import screen_brightness_control as sbc
+except ImportError:
+    sbc = None
+
 from jarvis.logger import logger
+from jarvis.tools.base import ToolResult, tool
 
 SETTINGS_PAGE_MAP = {
     "wifi": "ms-settings:network-wifi",
@@ -27,16 +40,165 @@ SETTINGS_PAGE_MAP = {
 }
 
 
+def _get_audio_endpoint():
+    """Retrieves the default audio endpoint volume interface."""
+    if not AudioUtilities:
+        return None
+    try:
+        device = AudioUtilities.GetSpeakers()
+        if hasattr(device, "EndpointVolume"):
+            return device.EndpointVolume
+    except Exception as e:
+        logger.warning("Could not obtain audio endpoint: %s", e)
+    return None
+
+
+@tool(
+    name="set_volume",
+    description="Sets the master system audio volume to a percentage between 0 and 100.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "percent": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Target volume percentage from 0 to 100.",
+            }
+        },
+        "required": ["percent"],
+    },
+    dangerous=False,
+    category="system",
+)
+def set_volume(percent: int) -> ToolResult:
+    """Sets system master volume percentage."""
+    vol = _get_audio_endpoint()
+    if not vol:
+        return ToolResult(ok=False, output="Audio control is unavailable.")
+
+    clamped = max(0, min(100, int(percent)))
+    scalar = clamped / 100.0
+    try:
+        vol.SetMasterVolumeLevelScalar(scalar, None)
+        return ToolResult(ok=True, output=f"Volume set to {clamped}%.")
+    except Exception as e:
+        logger.error("Failed to set volume: %s", e)
+        return ToolResult(ok=False, output=f"Failed to set volume: {str(e)}")
+
+
+@tool(
+    name="get_volume",
+    description="Returns the current master system audio volume percentage and mute status.",
+    input_schema={"type": "object", "properties": {}},
+    dangerous=False,
+    category="system",
+)
+def get_volume() -> ToolResult:
+    """Retrieves current volume percentage and mute state."""
+    vol = _get_audio_endpoint()
+    if not vol:
+        return ToolResult(ok=False, output="Audio control is unavailable.")
+
+    try:
+        scalar = vol.GetMasterVolumeLevelScalar()
+        muted = bool(vol.GetMute())
+        pct = int(round(scalar * 100))
+        mute_str = " (Muted)" if muted else ""
+        return ToolResult(ok=True, output=f"Current volume is {pct}%{mute_str}.")
+    except Exception as e:
+        return ToolResult(ok=False, output=f"Failed to read volume: {str(e)}")
+
+
+@tool(
+    name="mute",
+    description="Mutes or unmutes the master system audio.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "state": {
+                "type": "boolean",
+                "description": "True to mute, False to unmute.",
+            }
+        },
+        "required": ["state"],
+    },
+    dangerous=False,
+    category="system",
+)
+def mute(state: bool) -> ToolResult:
+    """Mutes or unmutes system audio."""
+    vol = _get_audio_endpoint()
+    if not vol:
+        return ToolResult(ok=False, output="Audio control is unavailable.")
+
+    try:
+        vol.SetMute(int(state), None)
+        action = "Muted" if state else "Unmuted"
+        return ToolResult(ok=True, output=f"System audio {action}.")
+    except Exception as e:
+        return ToolResult(ok=False, output=f"Failed to toggle mute: {str(e)}")
+
+
+@tool(
+    name="set_brightness",
+    description="Sets the primary display brightness percentage from 0 to 100.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "percent": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Brightness percentage from 0 to 100.",
+            }
+        },
+        "required": ["percent"],
+    },
+    dangerous=False,
+    category="system",
+)
+def set_brightness(percent: int) -> ToolResult:
+    """Sets screen brightness percentage."""
+    if not sbc:
+        return ToolResult(ok=False, output="Screen brightness control is not available.")
+
+    clamped = max(0, min(100, int(percent)))
+    try:
+        sbc.set_brightness(clamped)
+        return ToolResult(ok=True, output=f"Display brightness set to {clamped}%.")
+    except Exception as e:
+        logger.error("Failed to set brightness: %s", e)
+        return ToolResult(ok=False, output=f"Failed to set brightness: {str(e)}")
+
+
+@tool(
+    name="get_brightness",
+    description="Gets the current primary display brightness percentage.",
+    input_schema={"type": "object", "properties": {}},
+    dangerous=False,
+    category="system",
+)
+def get_brightness() -> ToolResult:
+    """Retrieves current display brightness."""
+    if not sbc:
+        return ToolResult(ok=False, output="Screen brightness control is not available.")
+
+    try:
+        levels = sbc.get_brightness()
+        val = levels[0] if isinstance(levels, list) and levels else levels
+        return ToolResult(ok=True, output=f"Current display brightness is {val}%.")
+    except Exception as e:
+        return ToolResult(ok=False, output=f"Failed to get brightness: {str(e)}")
+
+
 @tool(
     name="get_system_info",
     description=(
         "Returns current system metrics: CPU usage %, RAM usage %, disk free space, "
         "battery percentage & charging state, and current local date and time."
     ),
-    input_schema={
-        "type": "object",
-        "properties": {},
-    },
+    input_schema={"type": "object", "properties": {}},
     dangerous=False,
     category="system",
 )
@@ -74,6 +236,125 @@ def get_system_info() -> ToolResult:
 
 
 @tool(
+    name="lock_screen",
+    description="Locks the Windows workstation immediately.",
+    input_schema={"type": "object", "properties": {}},
+    dangerous=False,
+    category="system",
+)
+def lock_screen() -> ToolResult:
+    """Locks the workstation using user32.dll LockWorkStation."""
+    try:
+        subprocess.run(["rundll32.exe", "user32.dll,LockWorkStation"], check=True)
+        return ToolResult(ok=True, output="Workstation locked.")
+    except Exception as e:
+        return ToolResult(ok=False, output=f"Failed to lock workstation: {str(e)}")
+
+
+@tool(
+    name="shutdown_pc",
+    description="Shuts down, restarts, or puts the PC into sleep mode. Requires explicit user confirmation.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "action": {
+                "type": "string",
+                "enum": ["shutdown", "restart", "sleep"],
+                "description": "The power operation to perform: shutdown, restart, or sleep.",
+            }
+        },
+        "required": ["action"],
+    },
+    dangerous=True,
+    category="system",
+)
+def shutdown_pc(action: str) -> ToolResult:
+    """Initiates shutdown, reboot, or suspend on the local machine."""
+    act = action.strip().lower()
+    try:
+        if act == "shutdown":
+            subprocess.run(["shutdown", "/s", "/t", "15", "/c", "Jarvis initiated shutdown in 15 seconds."], check=True)
+            return ToolResult(ok=True, output="PC shutdown initiated in 15 seconds.")
+        elif act == "restart":
+            subprocess.run(["shutdown", "/r", "/t", "15", "/c", "Jarvis initiated restart in 15 seconds."], check=True)
+            return ToolResult(ok=True, output="PC restart initiated in 15 seconds.")
+        elif act == "sleep":
+            subprocess.run(["rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0"], check=True)
+            return ToolResult(ok=True, output="PC placed in sleep mode.")
+        else:
+            return ToolResult(ok=False, output=f"Invalid shutdown action: '{action}'.")
+    except Exception as e:
+        logger.error("Failed to execute power action '%s': %s", action, e)
+        return ToolResult(ok=False, output=f"Failed to {act} PC: {str(e)}")
+
+
+@tool(
+    name="toggle_wifi",
+    description="Toggles Wi-Fi adapter state. Opens Settings page if direct adapter control is restricted.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "state": {"type": "boolean", "description": "True to enable, False to disable."}
+        },
+        "required": ["state"],
+    },
+    dangerous=False,
+    category="system",
+)
+def toggle_wifi(state: bool) -> ToolResult:
+    """Attempts to toggle Wi-Fi via netsh, falling back to opening Settings."""
+    cmd_state = "ENABLED" if state else "DISABLED"
+    try:
+        res = subprocess.run(
+            ["netsh", "interface", "set", "interface", 'name="Wi-Fi"', f"admin={cmd_state}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if res.returncode == 0:
+            return ToolResult(ok=True, output=f"Wi-Fi adapter {cmd_state.lower()}.")
+    except Exception:
+        pass
+
+    # Fallback to ms-settings:network-wifi
+    try:
+        os.startfile("ms-settings:network-wifi")
+        status = "enable" if state else "disable"
+        return ToolResult(
+            ok=True,
+            output=f"Opened Wi-Fi Settings. Direct adapter toggle requires elevated privileges; please {status} Wi-Fi here.",
+        )
+    except Exception as e:
+        return ToolResult(ok=False, output=f"Could not open Wi-Fi settings: {str(e)}")
+
+
+@tool(
+    name="toggle_bluetooth",
+    description="Opens Bluetooth settings to manage device connections.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "state": {"type": "boolean", "description": "Desired state (True=on, False=off)."}
+        },
+        "required": ["state"],
+    },
+    dangerous=False,
+    category="system",
+)
+def toggle_bluetooth(state: bool) -> ToolResult:
+    """Opens Bluetooth settings since Windows does not provide unprivileged CLI bluetooth toggle."""
+    try:
+        os.startfile("ms-settings:bluetooth")
+        desired = "on" if state else "off"
+        return ToolResult(
+            ok=True,
+            output=f"Opened Bluetooth settings to turn Bluetooth {desired}.",
+        )
+    except Exception as e:
+        return ToolResult(ok=False, output=f"Failed to open Bluetooth settings: {str(e)}")
+
+
+@tool(
     name="open_settings_page",
     description="Opens a specific Windows Settings page (e.g. 'wifi', 'bluetooth', 'display', 'sound', 'update').",
     input_schema={
@@ -99,25 +380,6 @@ def open_settings_page(page: str) -> ToolResult:
     except Exception as e:
         logger.error("Failed to open settings page '%s': %s", page, e)
         return ToolResult(ok=False, output=f"Failed to open settings page: {str(e)}")
-
-
-@tool(
-    name="lock_screen",
-    description="Locks the Windows workstation immediately.",
-    input_schema={
-        "type": "object",
-        "properties": {},
-    },
-    dangerous=False,
-    category="system",
-)
-def lock_screen() -> ToolResult:
-    """Locks the workstation using user32.dll LockWorkStation."""
-    try:
-        subprocess.run(["rundll32.exe", "user32.dll,LockWorkStation"], check=True)
-        return ToolResult(ok=True, output="Workstation locked.")
-    except Exception as e:
-        return ToolResult(ok=False, output=f"Failed to lock workstation: {str(e)}")
 
 
 @tool(
@@ -163,10 +425,7 @@ def switch_llm_provider(provider: str) -> ToolResult:
 @tool(
     name="get_llm_info",
     description="Returns the currently active LLM provider and configured model name.",
-    input_schema={
-        "type": "object",
-        "properties": {},
-    },
+    input_schema={"type": "object", "properties": {}},
     dangerous=False,
     category="system",
 )

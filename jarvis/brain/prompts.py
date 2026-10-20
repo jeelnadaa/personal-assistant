@@ -64,21 +64,30 @@ def _get_screen_resolution() -> str:
         return "1920x1080"
 
 
-def build_system_prompt(memory_context: str = "No long-term preferences stored yet.") -> str:
-    """Constructs the system prompt with current environment state filled in.
+def build_system_prompt(memory_context: str | None = None) -> str:
+    """Constructs the system prompt with current environment state and memory filled in.
 
     Args:
-        memory_context: Context string retrieved from long-term memory.
+        memory_context: Optional context override. Defaults to get_memory_context().
 
     Returns:
         Formatted system prompt string.
     """
+    if memory_context is None:
+        try:
+            from jarvis.brain.memory import get_memory_context
+            mem_text = get_memory_context()
+        except Exception:
+            mem_text = "No long-term preferences stored yet."
+    else:
+        mem_text = memory_context
+
     now_str = datetime.now().strftime("%Y-%m-%d %I:%M %p")
     screen_size = _get_screen_resolution()
     active_win = _get_active_window_title()
 
     return SYSTEM_PROMPT_TEMPLATE.format(
-        memory_context=memory_context.strip() or "None",
+        memory_context=mem_text.strip() or "None",
         datetime=now_str,
         screen_size=screen_size,
         active_window=active_win,

@@ -54,23 +54,20 @@ class GroqProvider(LLMProvider):
                     api_messages.append({"role": "user", "content": msg.text})
 
             elif msg.role == "assistant":
-                if msg.raw is not None and isinstance(msg.raw, dict):
-                    api_messages.append(msg.raw)
-                else:
-                    item: dict[str, Any] = {"role": "assistant", "content": msg.text or None}
-                    if msg.tool_calls:
-                        item["tool_calls"] = [
-                            {
-                                "id": tc.id,
-                                "type": "function",
-                                "function": {
-                                    "name": tc.name,
-                                    "arguments": json.dumps(tc.args),
-                                },
-                            }
-                            for tc in msg.tool_calls
-                        ]
-                    api_messages.append(item)
+                item: dict[str, Any] = {"role": "assistant", "content": msg.text or None}
+                if msg.tool_calls:
+                    item["tool_calls"] = [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.name,
+                                "arguments": json.dumps(tc.args) if isinstance(tc.args, dict) else str(tc.args),
+                            },
+                        }
+                        for tc in msg.tool_calls
+                    ]
+                api_messages.append(item)
 
             elif msg.role == "tool":
                 for res in msg.tool_results:
