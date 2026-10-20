@@ -9,12 +9,20 @@ import ctypes
 import os
 import sys
 import time
+import warnings
 
-# Set Process DPI Awareness to Per-Monitor V2 so coordinates are real pixels
-try:
-    ctypes.windll.shcore.SetProcessDpiAwareness(2)
-except Exception:
-    pass
+# Configure COM apartment mode for pywinauto / Windows COM before any imports
+warnings.filterwarnings("ignore", category=UserWarning, module="pywinauto")
+if not hasattr(sys, "coinit_flags"):
+    sys.coinit_flags = 2  # COINIT_APARTMENTTHREADED (STA) compatible with Qt OleInitialize
+
+
+def enable_text_dpi_awareness() -> None:
+    """Sets process DPI awareness to Per-Monitor V2 for text/console mode if Qt is not used."""
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:
+        pass
 
 from jarvis.brain.agent import run_task
 from jarvis.brain.llm import get_active_provider
@@ -180,10 +188,7 @@ from jarvis.setup_check import run_all_checks
 def run_voice_gui_mode(show_console: bool = False) -> None:
     """Launches full voice mode with PySide6 overlay and system tray."""
     from PySide6 import QtCore, QtWidgets
-    from jarvis.app import JarvisApp
-    from jarvis.ui.overlay import get_overlay
 
-    validate_env()
     qt_app = QtWidgets.QApplication.instance()
     if qt_app is None:
         qt_app = QtWidgets.QApplication(sys.argv)
@@ -191,6 +196,11 @@ def run_voice_gui_mode(show_console: bool = False) -> None:
     # CRITICAL: Keep Qt application event loop alive in the system tray when overlay is hidden!
     qt_app.setQuitOnLastWindowClosed(False)
 
+    from jarvis.app import JarvisApp
+    from jarvis.config import validate_env
+    from jarvis.ui.overlay import get_overlay
+
+    validate_env()
     overlay = get_overlay()
     app = JarvisApp(ui_callback=overlay.update_state)
 
@@ -318,8 +328,8 @@ def main() -> None:
 
     try:
         text_mode = args.text is not None or config.get("modes", {}).get("text_mode", False)
-
         if text_mode:
+            enable_text_dpi_awareness()
             validate_env()
             start_killswitch()
             cmd = args.text if (args.text and args.text.strip()) else None

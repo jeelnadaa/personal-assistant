@@ -174,11 +174,12 @@ class JarvisApp:
                 self.tray.start()
             except Exception as e:
                 logger.warning("Could not start tray: %s", e)
-        self._set_state(AppState.IDLE, "Ready. Say 'Hey Jarvis'")
+        phrase = self.wake_detector.raw_phrase or "Hey Jarvis"
+        self._set_state(AppState.IDLE, f"Ready. Say '{phrase}'")
 
         print("=" * 60)
         print(" Jarvis Voice Assistant Running")
-        print(" Wake phrase: 'Hey Jarvis' | Kill Switch: Ctrl+Alt+J")
+        print(f" Wake phrase: '{phrase}' | Kill Switch: Ctrl+Alt+J")
         print(" Press Ctrl+C in terminal to stop.")
         print("=" * 60)
 

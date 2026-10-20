@@ -17,19 +17,24 @@ CHUNK_SIZE = 1280  # 80ms at 16kHz
 OPENWAKEWORD_BUILTIN = {
     "hey_jarvis": "hey_jarvis",
     "hey jarvis": "hey_jarvis",
+    "heyjarvis": "hey_jarvis",
     "alexa": "alexa",
     "hey_mycroft": "hey_mycroft",
     "hey mycroft": "hey_mycroft",
+    "heymycroft": "hey_mycroft",
     "hey_rhasspy": "hey_rhasspy",
     "hey rhasspy": "hey_rhasspy",
+    "heyrhasspy": "hey_rhasspy",
     "timer": "timer",
     "weather": "weather",
 }
 
 
 def normalize_phrase(phrase: str) -> str:
-    """Normalizes a phrase string for matching."""
-    return re.sub(r"[^a-zA-Z0-9\s]", "", phrase).strip().lower()
+    """Normalizes a phrase string for matching by stripping symbols and unifying whitespace."""
+    clean = re.sub(r"[^a-zA-Z0-9\s_]", "", phrase)
+    clean = re.sub(r"[\s_]+", " ", clean)
+    return clean.strip().lower()
 
 
 class WakeWordDetector:
@@ -126,7 +131,7 @@ class WakeWordDetector:
             # Mode A: openWakeWord built-in or custom ONNX
             if self.mode in ("openwakeword", "custom_onnx") and self.model:
                 while len(sample_buffer) >= (CHUNK_SIZE * 2):
-                    chunk_bytes = sample_buffer[: CHUNK_SIZE * 2]
+                    chunk_bytes = bytes(sample_buffer[: CHUNK_SIZE * 2])
                     del sample_buffer[: CHUNK_SIZE * 2]
 
                     audio_chunk = np.frombuffer(chunk_bytes, dtype=np.int16)
@@ -146,14 +151,15 @@ class WakeWordDetector:
             # Mode B: Two-Stage Hybrid Verification for arbitrary phrases
             elif self.mode == "whisper_verifier":
                 while len(sample_buffer) >= (CHUNK_SIZE * 2):
-                    chunk_bytes = sample_buffer[: CHUNK_SIZE * 2]
+                    chunk_bytes = bytes(sample_buffer[: CHUNK_SIZE * 2])
                     del sample_buffer[: CHUNK_SIZE * 2]
                     vad_accumulator.extend(chunk_bytes)
 
                     # When ~1.2s of speech is accumulated, verify with local whisper
                     if len(vad_accumulator) >= (16000 * 2 * 1.2):
-                        audio_data = np.frombuffer(vad_accumulator, dtype=np.int16)
+                        raw_bytes = bytes(vad_accumulator)
                         vad_accumulator.clear()
+                        audio_data = np.frombuffer(raw_bytes, dtype=np.int16)
 
                         # Only transcribe if audio has sufficient energy
                         if np.max(np.abs(audio_data)) > 700:
