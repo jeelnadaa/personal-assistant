@@ -179,22 +179,18 @@ def test_wake_greetings_formatting(monkeypatch):
     assert len(g_casual) > 0
 
 
-def test_wake_turn_plays_greeting_and_supports_barge_in(monkeypatch):
-    """Verifies that _process_voice_turn starts greeting and interrupts it when speech starts."""
+def test_wake_turn_plays_greeting_cleanly_before_recording(monkeypatch):
+    """Verifies that _process_voice_turn plays greeting to completion before recording to prevent speaker echo."""
     from jarvis.app import JarvisApp, AppState
 
     greetings_played = []
-    stopped_speech = []
 
     monkeypatch.setattr("jarvis.app.play_wake_greeting", lambda text, block=True: greetings_played.append(text) or True)
-    monkeypatch.setattr("jarvis.app.stop_speech", lambda: stopped_speech.append(True))
     monkeypatch.setattr("jarvis.app.transcribe", lambda samples: "hello jarvis")
     monkeypatch.setattr("jarvis.app.run_task", lambda text, ui_callback=None: "At your command, sir.")
     monkeypatch.setattr("jarvis.app.speak", lambda text, block=True: True)
 
     def fake_record(on_speech_start=None):
-        if on_speech_start:
-            on_speech_start()
         import numpy as np
         return np.ones(1600, dtype=np.int16)
 
@@ -204,7 +200,6 @@ def test_wake_turn_plays_greeting_and_supports_barge_in(monkeypatch):
     app._process_voice_turn(turn_id=1, is_followup=False)
 
     assert len(greetings_played) == 1
-    assert len(stopped_speech) >= 1  # Interrupted on speech start
 
 
 def test_wakeword_detector_reset():

@@ -72,4 +72,12 @@
   - **Satoshi Typography (`jarvis/ui/fonts.py`)**: Bundled official Satoshi font family applied across all application windows, floating pill, and cards.
   - **Draggable UI**: Both the Active Popup Card and Idle Floating Pill can be dragged anywhere on screen with double-click reset to bottom center.
   - **Full Test Suite Passing**: 101 automated unit tests passing (`tests/test_settings_and_models.py` included).
+- [x] **Phase 12: Natural Conversation, Multi-Session Context Persistence & Speaker Echo Elimination**
+  - **Natural Conversational Intelligence**: Updated system prompt and persona to balance engaging, articulate dialogue with PC automation tools. When users chat, ask questions, or discuss ideas, Jarvis responds directly without calling unnecessary tools.
+  - **Cross-Session Context Persistence (`jarvis/brain/context.py`)**: `ContextManager` automatically initializes from SQLite `history` table, ensuring conversation history persists across app restarts, multiple sessions, and machine reboots.
+  - **Persistent SQLite Database in User Profile (`jarvis/brain/memory.py`)**: Stores `memory.db` in `%LOCALAPPDATA%\Jarvis\memory.db`, protecting user memories and conversation history from being overwritten during app updates.
+  - **Speaker Audio Echo Elimination (`jarvis/app.py`)**: Fixed wake greeting playback by playing greeting to completion with short acoustic decay settling before beginning microphone recording. Prevents the microphone from picking up the speaker output.
+  - **Memory Tools Enhancement (`jarvis/tools/memory_tools.py`)**: Added `clear_history` tool allowing users to clear active or all conversation history.
+  - **Full Test Suite Passing**: 105 automated unit tests passing (`tests/test_conversation_and_context.py` included).
+
 

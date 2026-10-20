@@ -159,27 +159,19 @@ class JarvisApp:
             greeting = get_wake_greeting()
             self._set_state(AppState.LISTENING, greeting)
 
-            def _play_greeting() -> None:
-                try:
-                    play_wake_greeting(greeting, block=True)
-                except Exception as e:
-                    logger.debug("Wake greeting playback failed: %s", e)
+            try:
+                play_wake_greeting(greeting, block=True)
+            except Exception as e:
+                logger.debug("Wake greeting playback failed: %s", e)
 
-            greeting_thread = threading.Thread(
-                target=_play_greeting,
-                daemon=True,
-                name=f"WakeGreetingPlayback-{turn_id}",
-            )
-            greeting_thread.start()
+            # Check if cancelled or superseded during greeting playback
+            if turn_id != self.turn_counter or is_task_cancelled():
+                return
 
-            def _on_speech_started() -> None:
-                logger.info("User speech detected during greeting; interrupting greeting playback immediately.")
-                stop_speech()
-                if turn_id == self.turn_counter and not is_task_cancelled():
-                    self._set_state(AppState.LISTENING, "Listening...")
-
-            audio_samples = mic_stream.record_until_silence(on_speech_start=_on_speech_started)
-            stop_speech()  # Ensure greeting audio is silenced when recording finishes
+            # Short acoustic settle delay so room echo from speakers does not bleed into mic
+            time.sleep(0.08)
+            self._set_state(AppState.LISTENING, "Listening...")
+            audio_samples = mic_stream.record_until_silence()
         else:
             audio_samples = mic_stream.record_until_silence()
 

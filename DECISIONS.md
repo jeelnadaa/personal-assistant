@@ -112,3 +112,19 @@
   - Added full mouse drag handling (`mousePressEvent`, `mouseMoveEvent`, `mouseReleaseEvent`) to both `ActivePopupCard` and `IdlePillWidget`.
   - Double-clicking either widget resets position back to the default bottom-center screen alignment above the Windows taskbar.
 
+## Phase 12 Decisions (Natural Conversation, Multi-Session Context Persistence & Speaker Echo Elimination)
+- **Natural Conversation Persona Guidance (`jarvis/brain/prompts.py`)**:
+  - Separated pure conversation from PC automation in `SYSTEM_PROMPT_TEMPLATE`.
+  - Clarified that for questions, casual banter, greetings, brainstorming, and creative advice, Jarvis speaks directly as an intelligent companion without invoking tools. Tools are reserved strictly for actual PC interactions (launching apps, controlling media, managing files, clicking, typing, executing shell commands, or querying live web/system data).
+- **Persistent SQLite Cross-Session Context (`jarvis/brain/context.py` & `jarvis/brain/memory.py`)**:
+  - Updated `memory.db` location to `%LOCALAPPDATA%\Jarvis\memory.db` with repository migration fallback. This ensures all conversation history and facts survive app updates and portable EXE movements.
+  - Implemented `get_recent_history()` in `memory.py` to retrieve chronological exchanges from SQLite.
+  - Updated `ContextManager` to initialize from SQLite history on startup, enabling seamless cross-session recall of user discussions, topics, and preferences.
+  - Removed arbitrary 30-minute conversation buffer wipes; past turns remain available in conversational context up to the configured token budget.
+  - Added `clear_history` tool allowing users to purge conversation turns on demand.
+- **Sequential Wake Greeting & Acoustic Settle (`jarvis/app.py`)**:
+  - Resolved speaker feedback loop where the microphone recorded Jarvis's own wake greeting ("Yes sir, how can I help you?").
+  - `_process_voice_turn()` now plays the greeting synchronously to completion, followed by an 80ms acoustic room reverb decay pause before starting microphone recording.
+  - Microphone recording queue is purged immediately before listening begins, guaranteeing zero speaker audio is fed into STT.
+
+

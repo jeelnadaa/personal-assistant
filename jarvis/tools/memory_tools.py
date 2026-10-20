@@ -66,3 +66,25 @@ def forget(key: str) -> ToolResult:
     if deleted:
         return ToolResult(ok=True, output=f"Forgot '{key}'.")
     return ToolResult(ok=False, output=f"No memory found with key '{key}'.")
+
+
+@tool(
+    name="clear_history",
+    description="Clears past conversation turns and session exchanges from memory.",
+    input_schema={
+        "type": "object",
+        "properties": {
+            "clear_all": {"type": "boolean", "description": "If true, purges all historical session logs. If false, clears only active session context."}
+        },
+        "required": [],
+    },
+    dangerous=False,
+    category="memory",
+)
+def clear_history(clear_all: bool = False) -> ToolResult:
+    """Clears conversation context."""
+    from jarvis.brain.context import context_manager
+    context_manager.clear(clear_storage=clear_all)
+    scope = "all past and active" if clear_all else "active"
+    return ToolResult(ok=True, output=f"Cleared {scope} conversation history.")
+

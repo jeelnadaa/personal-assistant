@@ -7,8 +7,24 @@ import sqlite3
 from typing import Any
 
 from jarvis.logger import logger
+from jarvis.security.vault import get_user_data_dir
 
-DB_PATH = Path("data/memory.db")
+
+def get_db_path() -> Path:
+    """Returns the persistent memory.db database path in %LOCALAPPDATA%\\Jarvis with local fallback."""
+    user_db = get_user_data_dir() / "memory.db"
+    if not user_db.exists():
+        repo_db = Path("data/memory.db")
+        if repo_db.exists():
+            try:
+                import shutil
+                user_db.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(repo_db, user_db)
+            except Exception:
+                return repo_db
+    user_db.parent.mkdir(parents=True, exist_ok=True)
+    return user_db
+
 
 # Patterns indicating potential secrets or sensitive tokens
 SECRET_PATTERNS = [
@@ -21,8 +37,9 @@ SECRET_PATTERNS = [
 
 def _init_db() -> sqlite3.Connection:
     """Ensures database directory and schema exist and returns a connection."""
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    db_path = get_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path)
     with conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS facts (
@@ -168,3 +185,51 @@ def get_memory_context() -> str:
     except Exception as e:
         logger.error("Failed to read memory context: %s", e)
         return "No long-term preferences stored yet."
+
+
+def get_recent_history(limit: int = 10) -> list[dict[str, Any]]:
+    """Retrieves the most recent conversation exchanges in chronological order.
+
+    Args:
+        limit: Maximum number of exchanges to return.
+
+    Returns:
+        List of dicts with keys 'user_text', 'assistant_reply', 'timestamp'.
+    """
+    try:
+        conn = _init_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT ts, user_text, final_reply FROM history ORDER BY id DESC LIMIT ?",
+            (limit,),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+
+        exchanges: list[dict[str, Any]] = []
+        for ts, u, r in reversed(rows):
+            exchanges.append({
+                "timestamp": ts,
+                "user_text": u,
+                "assistant_reply": r,
+                "actions_taken": [],
+            })
+        return exchanges
+    except Exception as exc:
+        logger.error("Failed to retrieve recent history: %s", exc)
+        return []
+
+
+def clear_all_history() -> bool:
+    """Purges all conversation history turns from the persistent database."""
+    try:
+        conn = _init_db()
+        with conn:
+            conn.execute("DELETE FROM history")
+        conn.close()
+        logger.info("Cleared all conversation history.")
+        return True
+    except Exception as exc:
+        logger.error("Failed to clear conversation history: %s", exc)
+        return False
+

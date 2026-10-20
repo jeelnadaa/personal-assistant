@@ -120,6 +120,16 @@ Local model dropdowns **strictly discover models physically present and verified
 
 ---
 
+## Natural Conversation & Multi-Session Context
+
+Jarvis acts as an intelligent conversational companion and assistant, not merely a task runner:
+- **Conversational Intelligence**: For questions, discussions, brainstorming, greetings, and casual chat, Jarvis answers directly with witty, articulate speech (1–3 sentences) without invoking unnecessary tools.
+- **Cross-Session Memory**: Conversation turns are continuously stored in `%LOCALAPPDATA%\Jarvis\memory.db`. When you close and reopen Jarvis—or restart your PC—previous discussion context, names, and topics are automatically loaded and remembered.
+- **Echo-Free Wake Greeting**: When waking Jarvis with "Hey Jarvis", the greeting ("Yes sir, what's on your mind?") plays cleanly and completes with room acoustic reverb settling before microphone recording begins, preventing speaker audio from ever feeding back into speech recognition.
+- **Clear History Tool**: Say "Jarvis, clear our conversation history" or use the `clear_history` tool to reset context whenever desired.
+
+---
+
 ## Interactive UI & Shortcuts
 
 - **Draggable UI**: Click and drag anywhere on the **Floating Idle Pill** or the **Active Popup Card** to reposition it on your screen.
