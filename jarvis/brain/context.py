@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Any
 from jarvis.brain.providers.base import Msg, ToolCall
 from jarvis.config import config
+from jarvis.logger import logger
 from jarvis.tools.base import ToolResult
 
 
