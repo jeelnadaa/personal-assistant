@@ -172,41 +172,13 @@ def run_provider_self_test() -> None:
     print("\nSelf-test complete.\n")
 
 
-def main() -> None:
-    """CLI entry point parsing flags and executing appropriate mode."""
-    parser = argparse.ArgumentParser(description="Jarvis Voice & Automation Assistant")
-    parser.add_argument(
-        "--text",
-        nargs="?",
-        const="",
-        default=None,
-        help="Run in text mode. Optionally pass a single command string to execute non-interactively.",
-    )
-    parser.add_argument(
-        "--test-provider",
-        action="store_true",
-        help="Run self-test on the currently active LLM provider.",
-    )
-    args = parser.parse_args()
+from jarvis.crash_recovery import CrashSupervisor
+from jarvis.platform.mutex import SingleInstanceMutex
+from jarvis.setup_check import run_all_checks
 
-    if args.test_provider:
-        validate_env()
-        run_provider_self_test()
-        return
 
-    text_mode = args.text is not None or config.get("modes", {}).get("text_mode", False)
-
-    if text_mode:
-        validate_env()
-        start_killswitch()
-        cmd = args.text if (args.text and args.text.strip()) else None
-        try:
-            run_text_repl(initial_command=cmd)
-        finally:
-            stop_killswitch()
-        return
-
-    # Voice mode with GUI overlay and system tray
+def run_voice_gui_mode() -> None:
+    """Launches full voice mode with PySide6 overlay and system tray."""
     from PySide6 import QtCore, QtWidgets
     from jarvis.app import JarvisApp
     from jarvis.ui.overlay import get_overlay
@@ -238,6 +210,88 @@ def main() -> None:
         print("\nStopping Jarvis...")
     finally:
         app.stop()
+
+
+def main() -> None:
+    """CLI entry point parsing flags and executing appropriate mode."""
+    parser = argparse.ArgumentParser(description="Jarvis Voice & Automation Assistant")
+    parser.add_argument(
+        "--text",
+        nargs="?",
+        const="",
+        default=None,
+        help="Run in text mode. Optionally pass a single command string to execute non-interactively.",
+    )
+    parser.add_argument(
+        "--test-provider",
+        action="store_true",
+        help="Run self-test on the currently active LLM provider.",
+    )
+    parser.add_argument(
+        "--check-setup",
+        action="store_true",
+        help="Run pre-flight diagnostic hardware, key, and model verification.",
+    )
+    parser.add_argument(
+        "--no-mutex",
+        action="store_true",
+        help="Bypass single-instance named mutex lock.",
+    )
+    parser.add_argument(
+        "--no-crash-recovery",
+        action="store_true",
+        help="Disable automatic crash recovery supervisor loop.",
+    )
+    args = parser.parse_args()
+
+    if args.check_setup:
+        print("Running Jarvis pre-flight setup check...\n")
+        results = run_all_checks()
+        failed = False
+        for res in results:
+            print(f"[{res.status:<4}] {res.name}: {res.message}")
+            if res.fix_hint:
+                print(f"       Fix: {res.fix_hint}")
+            if res.status == "FAIL":
+                failed = True
+        sys.exit(1 if failed else 0)
+
+    if args.test_provider:
+        validate_env()
+        run_provider_self_test()
+        return
+
+    # Single-instance enforcement
+    mutex: SingleInstanceMutex | None = None
+    if not args.no_mutex:
+        mutex = SingleInstanceMutex()
+        if not mutex.acquire():
+            print("[!] Another instance of Jarvis is already running. Exiting.")
+            sys.exit(0)
+
+    try:
+        text_mode = args.text is not None or config.get("modes", {}).get("text_mode", False)
+
+        if text_mode:
+            validate_env()
+            start_killswitch()
+            cmd = args.text if (args.text and args.text.strip()) else None
+            try:
+                run_text_repl(initial_command=cmd)
+            finally:
+                stop_killswitch()
+            return
+
+        # Voice mode with GUI overlay and system tray
+        if args.no_crash_recovery:
+            run_voice_gui_mode()
+        else:
+            supervisor = CrashSupervisor()
+            supervisor.run_supervised(run_voice_gui_mode)
+
+    finally:
+        if mutex:
+            mutex.release()
 
 
 if __name__ == "__main__":

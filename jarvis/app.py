@@ -186,5 +186,13 @@ class JarvisApp:
         stop_killswitch()
         mic_stream.stop()
         stop_speech()
+
+        try:
+            from jarvis.tools.web import browser_close
+
+            browser_close()
+        except Exception as e:
+            logger.debug("Browser cleanup during shutdown: %s", e)
+
         self._set_state(AppState.PAUSED, "Stopped")
         logger.info("Jarvis Application stopped.")

@@ -27,6 +27,9 @@
 - [x] **Phase 7: Memory + browser automation**
   - SQLite long-term memory (`memory.py`) with facts and history tables, secret filtering
   - Playwright persistent browser automation (`data/browser_profile`, headed/headless, click, type, read)
-- [ ] **Phase 8: Run on startup + polish**
-  - Windows startup registration script (`install_startup.py`)
-  - Named mutex single-instance lock, crash recovery, first-run setup check
+- [x] **Phase 8: Run on startup + polish**
+  - Windows startup registration script (`install_startup.py` using `pythonw.exe` and `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`)
+  - Named mutex single-instance lock (`Local\JarvisDesktopAssistantSingleInstanceMutex`)
+  - Crash recovery supervisor with rate-limiting (max 3 restarts per hour)
+  - Pre-flight diagnostic setup check script (`scripts/setup_check.py` and `main.py --check-setup`)
+

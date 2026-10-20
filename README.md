@@ -4,7 +4,7 @@ Jarvis is a voice-controlled personal AI assistant for Windows 11 that runs in t
 
 ---
 
-## Current Status (Phase 6: Screen Vision & UI Automation)
+## Current Status: Production Ready (All 8 Phases Completed)
 
 - **Completed Phases**:
   - **Phase 1: Skeleton + Text Brain** (Foundation, LLM adapters, CLI, test loop)
@@ -13,6 +13,8 @@ Jarvis is a voice-controlled personal AI assistant for Windows 11 that runs in t
   - **Phase 4: Voice Pipeline** (OpenWakeWord, 16kHz mic stream with VAD, Groq/faster-whisper STT, Edge-TTS/pyttsx3 TTS, state machine)
   - **Phase 5: UI** (PySide6 frameless translucent overlay with animations, Allow/Deny buttons, voice confirmations, and pystray system tray)
   - **Phase 6: Screen Vision** (DPI awareness, coordinate unscaling, pywinauto UIA controls inspection & clicking, screenshot downscaling, and older screenshot pruning)
+  - **Phase 7: Memory & Browser Automation** (SQLite persistent memory with credential filtering, Playwright persistent browser automation)
+  - **Phase 8: Startup & Polish** (Silent Windows logon startup with `pythonw.exe`, named mutex single-instance lock, crash recovery supervisor, and pre-flight setup diagnostics)
 
 ---
 
@@ -23,11 +25,17 @@ Jarvis is a voice-controlled personal AI assistant for Windows 11 that runs in t
    - Protected paths (`C:\Windows`, `C:\Program Files`, `C:\Program Files (x86)`) cannot be modified or deleted.
    - Deletions are sent to the Windows Recycle Bin via `send2trash`, never permanently unlinked.
 2. **Interactive Confirmation (`jarvis/safety/confirm.py`)**:
-   - Prompts user in the console (`[y/N]`) or via GUI/voice with action summary and target details.
+   - Prompts user in the console (`[y/N]`) or via floating GUI overlay buttons or spoken voice responses (`yes`, `sure`, `no`, etc.) with a 15-second timeout.
 3. **Global Kill Switch (`jarvis/safety/killswitch.py`)**:
-   - System-wide **Ctrl+Alt+J** hotkey immediately halts LLM thinking, tool calls, and speech within milliseconds.
+   - System-wide **Ctrl+Alt+J** hotkey immediately halts LLM thinking, active tool calls, and speech within milliseconds (< 2s).
 4. **Audit Logging (`logs/audit.jsonl`)**:
    - Rotating JSONL log recording every executed tool, parameters (redacted for long strings), status, and confirmation outcomes.
+5. **Credential Shielding (`jarvis/brain/memory.py`)**:
+   - Persistent memory strictly rejects attempts to store API keys, tokens, or passwords (`sk-`, `gsk_`, `token`, `bearer`, etc.).
+6. **Single-Instance Enforcement (`jarvis/platform/mutex.py`)**:
+   - Uses a Windows Named Mutex (`Local\JarvisDesktopAssistantSingleInstanceMutex`) to prevent duplicate instances from running simultaneously.
+7. **Crash Recovery Supervisor (`jarvis/crash_recovery.py`)**:
+   - Automatically catches unhandled exceptions, records diagnostic tracebacks, and recovers the voice loop (rate-limited to a maximum of 3 restarts per hour).
 
 ---
 
@@ -106,8 +114,49 @@ python main.py --test-provider
 
 ---
 
+### Pre-Flight Setup Diagnostics
+To verify your API key, microphone hardware, speech recognition, speech synthesis, and browser automation:
+```powershell
+python scripts/setup_check.py
+# or
+python main.py --check-setup
+```
+
+### Windows Startup Registration (Run Silently on Login)
+Configure Jarvis to launch silently on Windows login using `pythonw.exe`:
+```powershell
+# Register Jarvis to start with Windows:
+python scripts/install_startup.py --install
+
+# Check current startup status:
+python scripts/install_startup.py --status
+
+# Remove Jarvis from Windows startup:
+python scripts/install_startup.py --uninstall
+```
+
+---
+
+## Long-Term Memory & Browser Automation
+
+### Durable Memory
+Jarvis maintains a persistent SQLite database in `data/memory.db`. Facts and preferences persist across reboots and sessions:
+- *"Remember that my favorite music app is Spotify"* -> Saved to SQLite.
+- *"What is my favorite music app?"* -> Recalled from memory.
+- *"Forget my favorite music app"* -> Removed.
+> **Security Guard**: API keys, credentials, tokens, and passwords are unconditionally rejected and never written to memory.
+
+### Persistent Browser Automation
+Powered by Playwright Chromium with persistent user profiles stored in `data/browser_profile`:
+- Keeps cookies, logins, and sessions active between restarts.
+- Launches headed by default so you can watch automated navigation in real-time.
+- Tools available to the assistant: `browser_open`, `browser_click`, `browser_type`, `browser_read`, and `browser_close`.
+- Try: *"Open youtube.com and search for lo-fi chill beats"*
+
+---
+
 ## Running Tests
-Run the entire test suite using `pytest`:
+Run the entire test suite across all 8 phases using `pytest`:
 ```powershell
 python -m pytest tests/ -v
 ```
@@ -116,7 +165,7 @@ python -m pytest tests/ -v
 
 ## How to Add a New Tool
 
-Create a new python file in `jarvis/tools/` or add to an existing module:
+Drop a Python file in `jarvis/tools/` or add to an existing module:
 
 ```python
 # jarvis/tools/example.py
@@ -143,7 +192,28 @@ Dropping a file like this in `jarvis/tools/` makes it available automatically on
 
 ## Troubleshooting
 
-- **Kill Switch**: If Ctrl+Alt+J fails to register, ensure no other software is using the hotkey or run as user with standard input privileges.
-- **DPI and Scaling**: Jarvis sets process DPI awareness (`ctypes.windll.shcore.SetProcessDpiAwareness(2)`) at startup to ensure coordinates correspond to real physical pixels.
-- **Provider API Keys**: If `validate_env()` fails on startup, verify that `.env` exists and contains the appropriate key for `LLM_PROVIDER`.
-- **Logs**: All runtime operations are logged to `logs/jarvis.log` and tool executions to `logs/audit.jsonl`.
+- **Microphone Not Found / No Input Devices**:
+  - Run `python scripts/check_mic.py` to inspect available input devices and volume sensitivity.
+  - Open **Windows Settings > Privacy & security > Microphone** and ensure "Microphone access" and "Let desktop apps access your microphone" are toggled **ON**.
+  - Ensure correct default input device is configured in Windows Sound Settings.
+- **Wake Word Sensitivity & False Triggers**:
+  - Open `config.yaml` and adjust `audio.vad_aggressiveness` (values 0-3; 2 is balanced, 3 is strict).
+  - You can increase the openWakeWord threshold in `config.yaml` if you experience false positives in noisy rooms.
+- **DPI Scaling & Coordinate Accuracy**:
+  - Jarvis automatically applies Per-Monitor V2 DPI awareness (`ctypes.windll.shcore.SetProcessDpiAwareness(2)`) at launch.
+  - Screenshots are captured at physical pixel resolution and downscaled to 1568px max side; click coordinates are automatically translated back via `scale_coordinates(x, y, scale)`.
+  - Works consistently across 100%, 125%, 150%, and multi-monitor setups.
+- **Playwright Chromium Not Installed**:
+  - If browser automation reports missing binaries, run:
+    ```powershell
+    python -m playwright install chromium
+    ```
+- **Single Instance Mutex Collision**:
+  - If Jarvis fails to launch with *"Another instance of Jarvis is already running"*, check the Windows System Tray or Task Manager for an existing background process, or pass `--no-mutex` to bypass the lock for development.
+- **Crash Recovery & Restarts**:
+  - The supervisor automatically recovers from unhandled exceptions up to 3 times per hour. If crashes persist, check `logs/jarvis.log` and `data/crash_history.json`.
+- **Global Kill Switch (Ctrl+Alt+J)**:
+  - If Ctrl+Alt+J fails to register, ensure no other software (such as keyboard utilities) is intercepting the hotkey. Run Jarvis in the active user session.
+- **Audit Logs**:
+  - Detailed tool actions, parameters, and user confirmations are recorded in `logs/audit.jsonl`.
+
