@@ -206,16 +206,35 @@ def main() -> None:
             stop_killswitch()
         return
 
-    # Voice mode
+    # Voice mode with GUI overlay and system tray
+    from PySide6 import QtCore, QtWidgets
     from jarvis.app import JarvisApp
+    from jarvis.ui.overlay import get_overlay
 
     validate_env()
-    app = JarvisApp()
+    qt_app = QtWidgets.QApplication.instance()
+    if qt_app is None:
+        qt_app = QtWidgets.QApplication(sys.argv)
+
+    overlay = get_overlay()
+    app = JarvisApp(ui_callback=overlay.update_state)
+
+    def on_quit() -> None:
+        app.stop()
+        qt_app.quit()
+
+    if app.tray:
+        app.tray.on_quit = on_quit
+
+    # Allow Python signals (like Ctrl+C) to wake the Qt event loop
+    sig_timer = QtCore.QTimer()
+    sig_timer.timeout.connect(lambda: None)
+    sig_timer.start(250)
+
+    app.start()
     try:
-        app.start()
-        while True:
-            time.sleep(0.5)
-    except KeyboardInterrupt:
+        qt_app.exec()
+    except (KeyboardInterrupt, SystemExit):
         print("\nStopping Jarvis...")
     finally:
         app.stop()

@@ -29,7 +29,11 @@ class AppState(Enum):
 class JarvisApp:
     """Jarvis core state machine managing voice events, speech pipeline, and task execution."""
 
-    def __init__(self, ui_callback: Callable[[str, str], None] | None = None) -> None:
+    def __init__(
+        self,
+        ui_callback: Callable[[str, str], None] | None = None,
+        enable_tray: bool = True,
+    ) -> None:
         self.state = AppState.IDLE
         self.running = False
         self.ui_callback = ui_callback  # (state, message)
@@ -38,6 +42,19 @@ class JarvisApp:
         # Audio components
         self.wake_detector = WakeWordDetector(on_detect=self._on_wake_detected)
         self.worker_thread: threading.Thread | None = None
+
+        # System tray
+        self.enable_tray = enable_tray
+        self.tray = None
+        if self.enable_tray:
+            try:
+                from jarvis.ui.tray import JarvisTray
+                self.tray = JarvisTray(
+                    on_quit=self.stop,
+                    get_status_fn=lambda: self.state.value,
+                )
+            except Exception as e:
+                logger.warning("Could not initialize system tray: %s", e)
 
         # Link kill switch to speech and task cancellation
         set_kill_callback(self._on_kill_switch)
@@ -144,6 +161,11 @@ class JarvisApp:
         mic_stream.start()
         start_killswitch()
         self.wake_detector.start()
+        if self.tray:
+            try:
+                self.tray.start()
+            except Exception as e:
+                logger.warning("Could not start tray: %s", e)
         self._set_state(AppState.IDLE, "Ready. Say 'Hey Jarvis'")
 
         print("=" * 60)
@@ -155,6 +177,11 @@ class JarvisApp:
     def stop(self) -> None:
         """Stops all background audio streams and listeners."""
         self.running = False
+        if self.tray:
+            try:
+                self.tray.stop()
+            except Exception as e:
+                logger.warning("Could not stop tray: %s", e)
         self.wake_detector.stop()
         stop_killswitch()
         mic_stream.stop()

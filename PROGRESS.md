@@ -19,7 +19,7 @@
   - Audio pipeline: `mic.py`, `wakeword.py`, `stt.py`, `tts.py`, `sounds.py`
   - Integration with `app.py` state machine
   - `scripts/check_mic.py`
-- [ ] **Phase 5: UI**
+- [x] **Phase 5: UI**
   - PySide6 overlay (`overlay.py`) with pulsing orb, waveform, confirm buttons
   - Tray icon and menu (`tray.py`)
 - [ ] **Phase 6: Screen vision**

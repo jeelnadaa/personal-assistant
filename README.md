@@ -4,13 +4,14 @@ Jarvis is a voice-controlled personal AI assistant for Windows 11 that runs in t
 
 ---
 
-## Current Status (Phase 4: Voice Pipeline)
+## Current Status (Phase 5: UI Overlay & System Tray)
 
 - **Completed Phases**:
   - **Phase 1: Skeleton + Text Brain** (Foundation, LLM adapters, CLI, test loop)
   - **Phase 2: Full Tool Set** (Complete system automation tools)
   - **Phase 3: Safety Layer** (Policy enforcement, user confirmation prompts, audit logging, Ctrl+Alt+J global kill switch)
   - **Phase 4: Voice Pipeline** (OpenWakeWord, 16kHz mic stream with VAD, Groq/faster-whisper STT, Edge-TTS/pyttsx3 TTS, state machine)
+  - **Phase 5: UI** (PySide6 frameless translucent overlay with animations, Allow/Deny buttons, voice confirmations, and pystray system tray)
 
 ---
 

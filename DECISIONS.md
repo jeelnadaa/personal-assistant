@@ -33,3 +33,11 @@
 - **Responsive Waiting**: `wait` tool polls `is_task_cancelled()` in 50ms intervals so global kill switch (Ctrl+Alt+J) aborts immediately.
 - **EnumWindows Compatibility**: Handled 64-bit Windows LPARAM conversion in `windows_mgmt.py` and `apps.py` by returning `True` from enum callbacks and passing integer `0`.
 
+## Phase 5 Decisions
+- **PySide6 Floating Overlay**: Frameless, translucent, always-on-top window positioned at the bottom center of the primary display (`jarvis/ui/overlay.py`). Styled with dark glassmorphic card aesthetics, drop shadow, and animated Qt canvas graphics (pulsing orb for listening, spinning arc for thinking, audio waveform bars for speaking, amber alert shield for confirmations, green check for completion, red for errors).
+- **Signal/Slot Thread Bridge**: Thread-safe communication between agent worker threads and Qt main thread using `OverlayBridge(QtCore.QObject)` with custom signals.
+- **Main Thread Event Pumping**: In `confirm.ask()` and `ask_confirmation()`, if executed on the main Qt GUI thread, dynamically pumps `app.processEvents()` in a 20ms poll loop to prevent thread deadlock while awaiting user action.
+- **Unified Dual-Mode Confirmation**: Allow/Deny buttons on the overlay and voice confirmation listener (`_voice_confirm_worker`) both update a single `overlay._confirm_result` and trigger `overlay._confirm_event`, supporting both button clicks and spoken affirmative/negative responses (`yes`, `yeah`, `sure`, etc.) within a 15-second timeout.
+- **System Tray**: `pystray` icon running in a dedicated background daemon thread (`jarvis/ui/tray.py`), providing quick actions: Status, Pause/Resume listening, Text mode guidance, Open logs folder, Stop current task, and Clean Quit.
+
+
