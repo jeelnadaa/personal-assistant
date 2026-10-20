@@ -94,6 +94,14 @@ def chat_with_retry(
                 current_provider.model,
                 exc,
             )
+            err_msg = str(exc).lower()
+            if any(term in err_msg for term in ("rate limit", "429", "quota", "tpd", "tokens per day", "timeout", "timed out")):
+                logger.warning(
+                    "Provider '%s' hit rate limit / quota or timeout. Fast failover to fallback provider without waiting for retries.",
+                    current_provider.name,
+                )
+                break
+
             if attempt < max_retries:
                 time.sleep(delay)
                 delay *= 2.0

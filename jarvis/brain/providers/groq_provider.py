@@ -21,7 +21,7 @@ class GroqProvider(LLMProvider):
         self.name = "groq"
         self.model = model or os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
         key = api_key or os.getenv("GROQ_API_KEY", "")
-        self.client = groq.Groq(api_key=key) if key else None
+        self.client = groq.Groq(api_key=key, timeout=15.0) if key else None
 
         # Check vision support from env or model name
         force_vision = os.getenv("FORCE_VISION", "").strip().lower()

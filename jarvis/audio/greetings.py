@@ -143,9 +143,11 @@ def warmup_wake_greetings() -> None:
         import asyncio
         import edge_tts
 
+        from jarvis.audio.tts import _format_edge_pitch
+
         voice = os.getenv("TTS_EDGE_VOICE", "en-GB-RyanNeural")
-        rate = os.getenv("TTS_EDGE_RATE", "-4%")
-        pitch = os.getenv("TTS_EDGE_PITCH", "-6Hz")
+        rate = os.getenv("TTS_EDGE_RATE", "+15%")
+        pitch = _format_edge_pitch(os.getenv("TTS_EDGE_PITCH"))
 
         for phrase in get_all_active_greetings():
             p = _get_cache_path(phrase)

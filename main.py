@@ -11,6 +11,9 @@ import sys
 import time
 import warnings
 
+# Silence Qt Windows QPA DPI awareness diagnostics when host already set DPI context
+os.environ.setdefault("QT_LOGGING_RULES", "qt.qpa.window=false")
+
 # Configure COM apartment mode for pywinauto / Windows COM before any imports
 warnings.filterwarnings("ignore", category=UserWarning, module="pywinauto")
 if not hasattr(sys, "coinit_flags"):

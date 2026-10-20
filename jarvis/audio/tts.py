@@ -85,6 +85,20 @@ def _speak_with_piper(text: str, block: bool) -> bool:
         return False
 
 
+def _format_edge_pitch(val: str | None) -> str:
+    """Ensures pitch matches the edge-tts regex requirement ^[+-]\\d+Hz$."""
+    if not val:
+        return "+0Hz"
+    val = val.strip()
+    if val == "-6Hz":
+        return "+0Hz"
+    if not val.endswith("Hz"):
+        val = f"{val}Hz"
+    if not (val.startswith("+") or val.startswith("-")):
+        val = f"+{val}"
+    return val
+
+
 def _speak_with_edge(text: str, block: bool) -> bool:
     """Synthesizes and plays speech using Microsoft Edge online neural TTS."""
     voice = os.getenv("TTS_EDGE_VOICE", "en-GB-RyanNeural")
@@ -98,8 +112,7 @@ def _speak_with_edge(text: str, block: bool) -> bool:
         pct = int(round((speed - 1.0) * 100))
         rate = f"+{pct}%" if pct >= 0 else f"{pct}%"
 
-    pitch_env = os.getenv("TTS_EDGE_PITCH")
-    pitch = pitch_env if (pitch_env and pitch_env != "-6Hz") else "0Hz"
+    pitch = _format_edge_pitch(os.getenv("TTS_EDGE_PITCH"))
 
     temp_mp3 = Path(tempfile.gettempdir()) / f"jarvis_tts_{os.getpid()}_{id(text)}.mp3"
     try:

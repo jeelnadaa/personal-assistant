@@ -92,8 +92,8 @@ class ActivePopupCard(QWidget):
             | Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.setFixedWidth(440)
+        self.setMinimumWidth(440)
+        self.setMaximumWidth(460)
 
         self._init_ui()
         self._init_shortcuts()
@@ -324,6 +324,8 @@ class ActivePopupCard(QWidget):
             self.confirm_detail.setText(text)
             self.confirm_widget.show()
 
+        self.root_layout.activate()
+        self.container_layout.activate()
         self.adjustSize()
         self.reposition_above_taskbar()
 
@@ -332,9 +334,12 @@ class ActivePopupCard(QWidget):
         screen = QApplication.primaryScreen()
         if screen:
             geo = screen.availableGeometry()
-            x = geo.x() + (geo.width() - self.width()) // 2
-            y = geo.y() + geo.height() - self.height() - 16
-            self.move(x, y)
+            hint = self.sizeHint()
+            w = max(self.width(), hint.width(), 440)
+            h = max(self.height(), hint.height())
+            x = geo.x() + (geo.width() - w) // 2
+            y = geo.y() + geo.height() - h - 16
+            self.setGeometry(x, y, w, h)
 
     def close_to_idle(self) -> None:
         """Dismisses the popup card and returns to idle floating pill."""
