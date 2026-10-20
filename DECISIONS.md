@@ -17,3 +17,8 @@
 - **Safe File Operations**: All destructive file actions (`delete_file`, `move_file`) check `protected_paths` (`C:\Windows`, `C:\Program Files`, etc.) and delete operations route through `send2trash` to prevent irreversible loss.
 - **Memory Security Guard**: Hardened `jarvis/brain/memory.py` to prevent storing credentials, passwords, or secret patterns (`sk-`, `gsk_`, tokens).
 - **Window Snapping**: Used `win32api.GetMonitorInfo` to accurately retrieve the current monitor's `Work` rectangle (excluding Windows taskbar) for left/right/fullscreen snaps.
+
+## Phase 3 Decisions
+- **Global Kill Switch (Ctrl+Alt+J)**: Implemented in `jarvis/safety/killswitch.py` using Windows `user32.RegisterHotKey` (ID 0x4A01, MOD_CONTROL | MOD_ALT, VK_J) and a daemon message queue thread. When triggered, sets `TASK_CANCEL_EVENT` to abort active tool iterations and agent thinking within milliseconds (< 2s).
+- **Confirmation Precedence**: In `jarvis/safety/policy.py`, checks for allowed shell commands and safe application names take precedence over base dangerous flags so trusted safe actions run without friction while untrusted commands always prompt.
+- **Interactive & Headless Fallbacks**: `jarvis/safety/confirm.py` supports pluggable custom confirmation handlers (voice/GUI) with fallback to terminal console `[y/N]` prompt.

@@ -4,23 +4,27 @@ Jarvis is a voice-controlled personal AI assistant for Windows 11 that runs in t
 
 ---
 
-## Current Status (Phase 2: Full Tool Set)
+## Current Status (Phase 3: Safety Layer)
 
 - **Completed Phases**:
   - **Phase 1: Skeleton + Text Brain** (Foundation, LLM adapters, CLI, test loop)
   - **Phase 2: Full Tool Set** (Complete system automation tools)
+  - **Phase 3: Safety Layer** (Policy enforcement, user confirmation prompts, audit logging, Ctrl+Alt+J global kill switch)
 
-### Available Tools:
-- **Applications (`apps.py`)**: `open_app`, `close_app`, `list_running_apps`
-- **Window Management (`windows_mgmt.py`)**: `list_windows`, `focus_window`, `minimize_window`, `maximize_window`, `snap_window` (left, right, fullscreen), `get_active_window`
-- **System Controls (`system.py`)**: `set_volume`, `get_volume`, `mute`, `set_brightness`, `get_brightness`, `get_system_info`, `lock_screen`, `shutdown_pc`, `toggle_wifi`, `toggle_bluetooth`, `open_settings_page`, `switch_llm_provider`, `get_llm_info`
-- **File System (`files.py`)**: `search_files`, `read_text_file`, `write_text_file`, `list_folder`, `open_file`, `move_file`, `copy_file`, `delete_file` (via Recycle Bin), `create_folder`
-- **Web & Search (`web.py`)**: `open_url`, `web_search`, `browser_get_page_text`
-- **Mouse & Keyboard (`input_control.py`)**: `type_text`, `press_key`, `hotkey`, `click`, `move_mouse`, `scroll`, `drag`, `wait`
-- **Screen & Vision (`screen.py`)**: `take_screenshot`, `get_screen_size`, `get_ui_elements`, `click_ui_element`, `read_screen_text`, `find_and_click`
-- **Clipboard (`clipboard.py`)**: `get_clipboard`, `set_clipboard`
-- **Shell (`shell.py`)**: `run_command` (PowerShell / Command Prompt)
-- **Long-term Memory (`memory_tools.py`)**: `remember`, `recall`, `forget`
+---
+
+## Safety & Security Architecture
+
+1. **Policy Enforcement (`jarvis/safety/policy.py`)**:
+   - Dangerous operations (e.g. deleting files, moving files, overwriting files, modifying system paths, shutting down the PC, running shell commands, closing unsaved apps) automatically request user approval before execution.
+   - Protected paths (`C:\Windows`, `C:\Program Files`, `C:\Program Files (x86)`) cannot be modified or deleted.
+   - Deletions are sent to the Windows Recycle Bin via `send2trash`, never permanently unlinked.
+2. **Interactive Confirmation (`jarvis/safety/confirm.py`)**:
+   - Prompts user in the console (`[y/N]`) or via GUI/voice with action summary and target details.
+3. **Global Kill Switch (`jarvis/safety/killswitch.py`)**:
+   - System-wide **Ctrl+Alt+J** hotkey immediately halts LLM thinking, tool calls, and speech within milliseconds.
+4. **Audit Logging (`logs/audit.jsonl`)**:
+   - Rotating JSONL log recording every executed tool, parameters (redacted for long strings), status, and confirmation outcomes.
 
 ---
 
@@ -56,20 +60,23 @@ GROQ_API_KEY=your_key_here
 python main.py --text
 ```
 
-### Direct Automation Commands
+### Safety Tests & Automation
 ```powershell
+# Dangerous action triggers confirmation:
+python main.py --text "delete the file test.txt in my downloads"
+
 # Adjust master volume
 python main.py --text "set volume to 30"
 
 # Web search
 python main.py --text "open chrome and search for python tutorials"
 
-# File search
-python main.py --text "find files named resume in my documents"
-
 # Window positioning
 python main.py --text "snap notepad to the left"
 ```
+
+### Kill Switch
+- Press **Ctrl+Alt+J** at any time to instantly stop active tasks.
 
 ### Run Active Provider Self-Test
 ```powershell
@@ -79,7 +86,7 @@ python main.py --test-provider
 ---
 
 ## Running Tests
-Run the test suite using `pytest`:
+Run the entire test suite using `pytest`:
 ```powershell
 python -m pytest tests/ -v
 ```
@@ -115,6 +122,7 @@ Dropping a file like this in `jarvis/tools/` makes it available automatically on
 
 ## Troubleshooting
 
+- **Kill Switch**: If Ctrl+Alt+J fails to register, ensure no other software is using the hotkey or run as user with standard input privileges.
 - **DPI and Scaling**: Jarvis sets process DPI awareness (`ctypes.windll.shcore.SetProcessDpiAwareness(2)`) at startup to ensure coordinates correspond to real physical pixels.
 - **Provider API Keys**: If `validate_env()` fails on startup, verify that `.env` exists and contains the appropriate key for `LLM_PROVIDER`.
 - **Logs**: All runtime operations are logged to `logs/jarvis.log` and tool executions to `logs/audit.jsonl`.

@@ -21,6 +21,7 @@ from jarvis.brain.llm import get_active_provider
 from jarvis.brain.providers.base import Msg, ToolCall, ToolResultMsg
 from jarvis.config import config, validate_env
 from jarvis.logger import logger
+from jarvis.safety.killswitch import start_killswitch, stop_killswitch
 
 
 def run_text_repl(initial_command: str | None = None) -> None:
@@ -197,14 +198,22 @@ def main() -> None:
 
     if text_mode:
         validate_env()
+        start_killswitch()
         cmd = args.text if (args.text and args.text.strip()) else None
-        run_text_repl(initial_command=cmd)
+        try:
+            run_text_repl(initial_command=cmd)
+        finally:
+            stop_killswitch()
         return
 
-    # In Phase 1, default without arguments or with --text enters text mode
+    # In Phase 1 & 2, default without arguments or with --text enters text mode
     print("Voice mode will be integrated in Phase 4. Defaulting to text mode...")
     validate_env()
-    run_text_repl()
+    start_killswitch()
+    try:
+        run_text_repl()
+    finally:
+        stop_killswitch()
 
 
 if __name__ == "__main__":

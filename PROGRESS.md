@@ -12,7 +12,7 @@
 - [x] **Phase 2: Full tool set**
   - Implement apps, windows_mgmt, system, files, web, input_control, screen basics, clipboard, shell, memory_tools
   - Comprehensive unit tests
-- [ ] **Phase 3: Safety layer**
+- [x] **Phase 3: Safety layer**
   - Policy enforcement (`policy.py`), interactive confirmation (`confirm.py`), audit log (`audit.py`)
   - Ctrl+Alt+J kill switch, loop prevention, max actions cap
 - [ ] **Phase 4: Voice**
