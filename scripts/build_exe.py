@@ -62,12 +62,6 @@ def copy_runtime_assets() -> None:
         shutil.copy2(env_ex_src, env_ex_dst)
         print(f" - Copied .env.example -> {env_ex_dst}")
 
-    # 3. If local .env exists, copy it to dist/.env so user doesn't need to retype keys
-    local_env = ROOT_DIR / ".env"
-    dist_env = DIST_DIR / ".env"
-    if local_env.exists() and not dist_env.exists():
-        shutil.copy2(local_env, dist_env)
-        print(f" - Copied active .env -> {dist_env}")
 
     # 4. Copy data/piper_voices if downloaded
     voices_src = ROOT_DIR / "data" / "piper_voices"

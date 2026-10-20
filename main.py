@@ -14,6 +14,12 @@ import warnings
 # Silence Qt Windows QPA DPI awareness diagnostics when host already set DPI context
 os.environ.setdefault("QT_LOGGING_RULES", "qt.qpa.window=false")
 
+# Safe stdout/stderr redirection for native GUI mode (console=False)
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
 # Configure COM apartment mode for pywinauto / Windows COM before any imports
 warnings.filterwarnings("ignore", category=UserWarning, module="pywinauto")
 if not hasattr(sys, "coinit_flags"):

@@ -164,9 +164,20 @@ def package_to_zip() -> None:
         print(f"[ERROR] Release directory does not exist: {RELEASE_DIR}")
         sys.exit(1)
 
+    # Purge any local .env file so portable distribution is purely in-app configured
+    release_env = RELEASE_DIR / ".env"
+    if release_env.exists():
+        try:
+            release_env.unlink()
+            print(f" - Removed .env from release folder ({release_env})")
+        except Exception as e:
+            print(f" - Warning: Could not remove {release_env}: {e}")
+
     with zipfile.ZipFile(ZIP_FILE, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zip_out:
         for file_path in RELEASE_DIR.rglob("*"):
             if file_path.is_file():
+                if file_path.name == ".env":
+                    continue
                 arcname = file_path.relative_to(DIST_DIR)
                 zip_out.write(file_path, arcname)
 

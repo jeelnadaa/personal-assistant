@@ -50,6 +50,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "provider": "groq",
         "model": "qwen/qwen3.8-27b",
         "fallback_provider": "gemini",
+        "fallback_model": "gemini-3.5-flash",
         "gemini_model": "gemini-3.5-flash",
         "anthropic_model": "claude-sonnet-5-5",
         "temperature": 0.2,
@@ -177,6 +178,8 @@ class SettingsManager:
 
         if llm_cfg.get("fallback_provider"):
             os.environ["FALLBACK_PROVIDER"] = llm_cfg.get("fallback_provider", "gemini")
+        if llm_cfg.get("fallback_model"):
+            os.environ["FALLBACK_MODEL"] = llm_cfg.get("fallback_model", "gemini-3.5-flash")
 
         # Also update global config object in jarvis.config
         try:

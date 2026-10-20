@@ -85,17 +85,8 @@ def get_all_active_greetings() -> list[str]:
     return list(GREETINGS_CASUAL)
 
 
-def _get_cache_path(greeting: str) -> Path:
-    """Computes a deterministic cache file path based on greeting text, provider, and voice."""
-    tts_prov = os.getenv("TTS_PROVIDER", config.get("tts", {}).get("provider", "edge")).strip().lower()
-    voice = os.getenv("TTS_EDGE_VOICE", "en-GB-RyanNeural") if tts_prov in ("edge", "cloud") else os.getenv("TTS_PIPER_VOICE", "en_GB-alan-medium")
-    key = f"{tts_prov}:{voice}:{greeting}"
-    digest = hashlib.md5(key.encode("utf-8")).hexdigest()[:16]
-    return get_greeting_cache_dir() / f"greet_{digest}.mp3"
-
-
 def play_wake_greeting(greeting: str, block: bool = True) -> bool:
-    """Plays the wake greeting using fast cached audio or on-demand synthesis with interruption support.
+    """Plays the wake greeting using the active configured TTS engine and settings.
 
     Args:
         greeting: Spoken greeting text.
@@ -104,63 +95,11 @@ def play_wake_greeting(greeting: str, block: bool = True) -> bool:
     Returns:
         True if greeting played successfully, False otherwise.
     """
-    cache_path = _get_cache_path(greeting)
-    tts._TTS_STOP_EVENT.clear()
-
-    # Try fast-path cached audio playback (<10ms latency)
-    if cache_path.exists() and cache_path.stat().st_size > 0:
-        try:
-            decoded = miniaudio.mp3_read_file_f32(str(cache_path))
-            audio_data = np.array(decoded.samples, dtype=np.float32)
-            if decoded.nchannels > 1:
-                audio_data = audio_data.reshape(-1, decoded.nchannels)
-
-            if not tts._TTS_STOP_EVENT.is_set():
-                sd.play(audio_data, samplerate=decoded.sample_rate, blocking=False)
-                if block:
-                    while sd.get_stream() and sd.get_stream().active:
-                        if tts._TTS_STOP_EVENT.is_set():
-                            sd.stop()
-                            break
-                        import time
-                        time.sleep(0.01)
-                return True
-        except Exception as e:
-            logger.debug("Cached greeting playback failed (%s); falling back to tts.speak", e)
-
-    # Fallback: regular speech synthesis
     tts.speak(greeting, block=block)
     return True
 
 
 def warmup_wake_greetings() -> None:
-    """Background task to pre-synthesize and cache greeting audio for near-instant wake response."""
-    def _worker() -> None:
-        tts_prov = os.getenv("TTS_PROVIDER", config.get("tts", {}).get("provider", "edge")).strip().lower()
-        if tts_prov not in ("edge", "cloud"):
-            return  # Piper is already local; edge-tts benefits most from pre-caching
-
-        import asyncio
-        import edge_tts
-
-        from jarvis.audio.tts import _format_edge_pitch
-
-        voice = os.getenv("TTS_EDGE_VOICE", "en-GB-RyanNeural")
-        rate = os.getenv("TTS_EDGE_RATE", "+15%")
-        pitch = _format_edge_pitch(os.getenv("TTS_EDGE_PITCH"))
-
-        for phrase in get_all_active_greetings():
-            p = _get_cache_path(phrase)
-            if not p.exists() or p.stat().st_size == 0:
-                try:
-                    temp_p = p.with_suffix(".tmp")
-                    comm = edge_tts.Communicate(text=phrase, voice=voice, rate=rate, pitch=pitch)
-                    asyncio.run(comm.save(str(temp_p)))
-                    if temp_p.exists() and temp_p.stat().st_size > 0:
-                        temp_p.replace(p)
-                        logger.debug("Pre-cached wake greeting: '%s'", phrase)
-                except Exception as e:
-                    logger.debug("Failed pre-caching greeting '%s': %s", phrase, e)
-
-    t = threading.Thread(target=_worker, daemon=True, name="GreetingWarmup")
-    t.start()
+    """Warmup hook for speech pipeline."""
+    # Active TTS synthesis handles instant playback via local Piper or Edge streaming
+    pass

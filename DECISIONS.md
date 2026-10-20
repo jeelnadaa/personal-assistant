@@ -127,4 +127,23 @@
   - `_process_voice_turn()` now plays the greeting synchronously to completion, followed by an 80ms acoustic room reverb decay pause before starting microphone recording.
   - Microphone recording queue is purged immediately before listening begins, guaranteeing zero speaker audio is fed into STT.
 
+## Phase 13 Decisions (Greeting TTS Consistency, Clean Styling, Fallback Models & Clean Portable GUI)
+- **Direct TTS Speech for Wake Greetings (`jarvis/audio/greetings.py`)**:
+  - Replaced legacy disk-cached greeting playback with direct `tts.speak(greeting, block=True)` invocation.
+  - Ensures wake greetings strictly inherit the user's active TTS engine (`piper`, `edge`, `pyttsx3`), active voice (`TTS_EDGE_VOICE` / `TTS_PIPER_VOICE`), rate, pitch, and speed factor without playing stale or mismatched audio files. Purged obsolete cached greeting audio.
+- **CSS Selector Isolation on Settings Cards (`jarvis/ui/settings_window.py`)**:
+  - Fixed Qt stylesheet inheritance bug where generic `QFrame` border styles leaked into child `QLabel` widgets (which inherit from `QFrame` in Qt), creating unwanted inner outline lines inside guide cards.
+  - Assigned `card.setObjectName("settingsCard")`, scoped borders strictly to `QFrame#settingsCard`, and explicitly declared `border: none; background: transparent;` on guide text labels.
+- **Custom Fallback Model Configuration in Settings & Brain (`jarvis/settings.py` & `jarvis/brain/llm.py`)**:
+  - Added `txt_fallback_model` input field in Settings -> LLM Orchestration, dynamically updating default placeholders when fallback provider changes (`gemini-3.5-flash`, `claude-sonnet-5-5`, `qwen/qwen3.8-27b`).
+  - Saved to `settings.json` and synchronized to `os.environ["FALLBACK_MODEL"]`.
+  - Updated `jarvis/brain/llm.py` so failover passes `model=os.getenv("FALLBACK_MODEL")` to the backup provider.
+- **Rigid 460px Popup Card Geometry (`jarvis/ui/overlay.py`)**:
+  - Resolved Windows platform plugin geometry conflict warning (`QWindowsWindow::setGeometry: Unable to set geometry 660x182... maximum size: 460x16777215`).
+  - Standardized `ActivePopupCard` to fixed width 460px (`self.setFixedWidth(460)`), aligning internal layout and label word-wrapping with the card bounds and eliminating unconstrained width requests.
+- **Native GUI Executable & Zero `.env` Dependency in Portable Release (`jarvis.spec` & `scripts/build_portable_zip.py`)**:
+  - Set `console=False` in `jarvis.spec` so `jarvis.exe` compiles using the Windows GUI subsystem (`runw.exe`), launching cleanly with no black command prompt window.
+  - Safely redirected `sys.stdout` and `sys.stderr` to `os.devnull` when running without a console.
+  - Removed frozen auto-creation of `.env` files in `jarvis/config.py` and purged `.env` from the portable release folder and ZIP archive. All configuration and keys reside strictly within user-writable `%LOCALAPPDATA%\Jarvis\settings.json` and the Windows DPAPI vault.
+
 

@@ -118,7 +118,8 @@ def chat_with_retry(
             on_fallback("Switching to my backup brain.")
 
         try:
-            fallback_provider = get_provider(name=fallback_name)
+            fb_model = os.getenv("FALLBACK_MODEL", "").strip() or None
+            fallback_provider = get_provider(name=fallback_name, model=fb_model)
             start_time = time.perf_counter()
             response = fallback_provider.chat(
                 system=system,

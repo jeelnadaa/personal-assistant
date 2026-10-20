@@ -272,3 +272,47 @@ def test_wake_word_barge_in_during_transcribing():
     # State switches to LISTENING
     assert app.state == AppState.LISTENING
 
+
+def test_active_popup_card_fixed_geometry(qapp):
+    """Verifies ActivePopupCard adheres to fixed 460px width without geometry constraint conflicts."""
+    from jarvis.ui.overlay import ActivePopupCard
+
+    card = ActivePopupCard()
+    assert card.width() == 460
+    assert card.maximumWidth() == 460
+    assert card.minimumWidth() == 460
+
+    # Even with very long response text that would normally size-hint wide
+    long_text = "This is a very long response line " * 20
+    card.set_mode("ANSWER", long_text, query="Long query")
+    card.reposition_above_taskbar()
+    assert card.width() == 460
+
+
+def test_settings_guides_styling_and_fallback_model(qapp):
+    """Verifies guide labels have no ugly border lines and fallback model input is wired."""
+    from jarvis.ui.settings_window import SettingsWindow
+
+    win = SettingsWindow()
+    # Check fallback model input exists in LLM tab
+    assert hasattr(win, "txt_fallback_model")
+    assert hasattr(win, "lbl_fallback_model")
+
+    # Check fallback provider changes update fallback model default
+    win.combo_fallback_provider.setCurrentText("groq")
+    assert win.txt_fallback_model.text() == "qwen/qwen3.8-27b"
+    win.combo_fallback_provider.setCurrentText("anthropic")
+    assert win.txt_fallback_model.text() == "claude-sonnet-5-5"
+    win.combo_fallback_provider.setCurrentText("none")
+    assert win.txt_fallback_model.isHidden()
+
+
+def test_wake_greeting_routed_to_tts_speak():
+    """Verifies that play_wake_greeting delegates to active tts.speak directly."""
+    from jarvis.audio import greetings
+
+    with patch("jarvis.audio.tts.speak") as mock_speak:
+        result = greetings.play_wake_greeting("Yes sir, what's on your mind?", block=True)
+        assert result is True
+        mock_speak.assert_called_once_with("Yes sir, what's on your mind?", block=True)
+

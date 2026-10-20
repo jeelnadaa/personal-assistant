@@ -310,12 +310,17 @@ class SettingsWindow(QWidget):
     def _create_card(self, title: str, subtitle: str = "") -> tuple[QFrame, QVBoxLayout]:
         """Creates a standardized dark card frame matching the design system."""
         card = QFrame(self)
+        card.setObjectName("settingsCard")
         card.setStyleSheet(
             """
-            QFrame {
+            QFrame#settingsCard {
                 background-color: #232323;
                 border: 1px solid #333333;
                 border-radius: 8px;
+            }
+            QLabel {
+                border: none;
+                background: transparent;
             }
             """
         )
@@ -599,8 +604,14 @@ class SettingsWindow(QWidget):
 
         self.combo_fallback_provider = QComboBox(self)
         self.combo_fallback_provider.addItems(["gemini", "anthropic", "groq", "none"])
+        self.combo_fallback_provider.currentTextChanged.connect(self._on_fallback_provider_changed)
         l.addWidget(QLabel("Fallback Provider (Fast failover if primary hits rate limit):"))
         l.addWidget(self.combo_fallback_provider)
+
+        self.lbl_fallback_model = QLabel("Fallback Model Identifier:")
+        self.txt_fallback_model = QLineEdit(self)
+        l.addWidget(self.lbl_fallback_model)
+        l.addWidget(self.txt_fallback_model)
 
         row_params = QHBoxLayout()
         row_params.addWidget(QLabel("Max Spoken Tokens:"))
@@ -629,6 +640,21 @@ class SettingsWindow(QWidget):
             self.txt_llm_model.setText("gemini-3.5-flash")
         elif p == "anthropic":
             self.txt_llm_model.setText("claude-sonnet-5-5")
+
+    def _on_fallback_provider_changed(self, prov: str) -> None:
+        p = prov.lower()
+        if p in ("none", "off", ""):
+            self.lbl_fallback_model.setVisible(False)
+            self.txt_fallback_model.setVisible(False)
+        else:
+            self.lbl_fallback_model.setVisible(True)
+            self.txt_fallback_model.setVisible(True)
+            if p == "gemini":
+                self.txt_fallback_model.setText("gemini-3.5-flash")
+            elif p == "anthropic":
+                self.txt_fallback_model.setText("claude-sonnet-5-5")
+            elif p == "groq":
+                self.txt_fallback_model.setText("qwen/qwen3.8-27b")
 
     # =========================================================================
     # TAB 5: API & CREDENTIALS
@@ -819,7 +845,7 @@ class SettingsWindow(QWidget):
             "4. Return to Settings -> TTS and click 'Refresh Local Voices'. Your voice will appear in the dropdown!",
             card_p,
         )
-        guide_p.setStyleSheet("color: #CCCCCC; font-size: 12px; line-height: 1.4;")
+        guide_p.setStyleSheet("color: #CCCCCC; font-size: 12px; line-height: 1.4; border: none; background: transparent;")
         guide_p.setWordWrap(True)
         l_p.addWidget(guide_p)
         v.addWidget(card_p)
@@ -834,7 +860,7 @@ class SettingsWindow(QWidget):
             "4. Once placed, click 'Refresh Local Models' in the STT tab.",
             card_w,
         )
-        guide_w.setStyleSheet("color: #CCCCCC; font-size: 12px; line-height: 1.4;")
+        guide_w.setStyleSheet("color: #CCCCCC; font-size: 12px; line-height: 1.4; border: none; background: transparent;")
         guide_w.setWordWrap(True)
         l_w.addWidget(guide_w)
         v.addWidget(card_w)
@@ -850,7 +876,7 @@ class SettingsWindow(QWidget):
             "  Obtain a key from https://console.anthropic.com/settings/keys",
             card_c,
         )
-        guide_c.setStyleSheet("color: #CCCCCC; font-size: 12px; line-height: 1.4;")
+        guide_c.setStyleSheet("color: #CCCCCC; font-size: 12px; line-height: 1.4; border: none; background: transparent;")
         guide_c.setWordWrap(True)
         l_c.addWidget(guide_c)
         v.addWidget(card_c)
@@ -900,7 +926,11 @@ class SettingsWindow(QWidget):
         llm_prov = settings.get("llm", "provider", "groq")
         self.combo_llm_provider.setCurrentText(llm_prov)
         self.txt_llm_model.setText(settings.get("llm", "model", "qwen/qwen3.8-27b"))
-        self.combo_fallback_provider.setCurrentText(settings.get("llm", "fallback_provider", "gemini"))
+        fb_prov = settings.get("llm", "fallback_provider", "gemini")
+        self.combo_fallback_provider.setCurrentText(fb_prov)
+        saved_fb_model = settings.get("llm", "fallback_model", "")
+        if saved_fb_model:
+            self.txt_fallback_model.setText(saved_fb_model)
         self.spin_max_tokens.setValue(int(settings.get("llm", "max_tokens", 800)))
         self.spin_temp.setValue(float(settings.get("llm", "temperature", 0.2)))
 
@@ -940,6 +970,7 @@ class SettingsWindow(QWidget):
         settings.set("llm", "provider", self.combo_llm_provider.currentText().lower())
         settings.set("llm", "model", self.txt_llm_model.text().strip())
         settings.set("llm", "fallback_provider", self.combo_fallback_provider.currentText().lower())
+        settings.set("llm", "fallback_model", self.txt_fallback_model.text().strip())
         settings.set("llm", "max_tokens", self.spin_max_tokens.value())
         settings.set("llm", "temperature", round(self.spin_temp.value(), 2))
 

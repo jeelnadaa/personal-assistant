@@ -72,12 +72,13 @@
   - **Satoshi Typography (`jarvis/ui/fonts.py`)**: Bundled official Satoshi font family applied across all application windows, floating pill, and cards.
   - **Draggable UI**: Both the Active Popup Card and Idle Floating Pill can be dragged anywhere on screen with double-click reset to bottom center.
   - **Full Test Suite Passing**: 101 automated unit tests passing (`tests/test_settings_and_models.py` included).
-- [x] **Phase 12: Natural Conversation, Multi-Session Context Persistence & Speaker Echo Elimination**
-  - **Natural Conversational Intelligence**: Updated system prompt and persona to balance engaging, articulate dialogue with PC automation tools. When users chat, ask questions, or discuss ideas, Jarvis responds directly without calling unnecessary tools.
-  - **Cross-Session Context Persistence (`jarvis/brain/context.py`)**: `ContextManager` automatically initializes from SQLite `history` table, ensuring conversation history persists across app restarts, multiple sessions, and machine reboots.
-  - **Persistent SQLite Database in User Profile (`jarvis/brain/memory.py`)**: Stores `memory.db` in `%LOCALAPPDATA%\Jarvis\memory.db`, protecting user memories and conversation history from being overwritten during app updates.
-  - **Speaker Audio Echo Elimination (`jarvis/app.py`)**: Fixed wake greeting playback by playing greeting to completion with short acoustic decay settling before beginning microphone recording. Prevents the microphone from picking up the speaker output.
-  - **Memory Tools Enhancement (`jarvis/tools/memory_tools.py`)**: Added `clear_history` tool allowing users to clear active or all conversation history.
-  - **Full Test Suite Passing**: 105 automated unit tests passing (`tests/test_conversation_and_context.py` included).
+- [x] **Phase 13: Greeting Voice Consistency, Clean Card Styling, Fallback Models & Clean GUI Distribution**
+  - **Greeting TTS Consistency**: Spoken wake greetings now route directly through `tts.speak(greeting, block=True)` using the active TTS engine (`piper`, `edge`, `pyttsx3`), active voice, and speed parameters without playing stale cached MP3 files.
+  - **Settings Guide Card Styling**: Fixed inner outline line on guide labels by scoping container borders to `QFrame#settingsCard` and explicitly defining `border: none; background: transparent;` on child labels.
+  - **Fallback Model Configuration**: Added Fallback Model Identifier field (`txt_fallback_model`) under Fallback Provider in Settings -> Brain, dynamically populating provider defaults (`gemini-3.5-flash`, `claude-sonnet-5-5`, `qwen/qwen3.8-27b`) and synchronizing to `FALLBACK_MODEL` for automated failover.
+  - **ActivePopupCard Fixed Geometry**: Standardized popup card to fixed width 460px (`self.setFixedWidth(460)`), eliminating Windows platform plugin geometry conflict warnings.
+  - **Native Windows GUI Executable**: Set `console=False` in `jarvis.spec` and redirected standard streams; `jarvis.exe` now launches cleanly without opening a black command prompt window.
+  - **Zero `.env` Dependency in Portable Distribution**: Removed frozen auto-creation of `.env` files and purged `.env` from `dist/Jarvis-Portable-Windows/` and `Jarvis-Portable-Windows.zip`. All configuration is managed seamlessly in-app via `%LOCALAPPDATA%\Jarvis\settings.json` and the DPAPI vault.
+  - **Full Test Suite Passing**: 108 automated unit tests passing (`tests/test_ui.py` additions included).
 
 

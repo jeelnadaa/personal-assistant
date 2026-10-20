@@ -51,16 +51,6 @@ def load_config(config_path: Path | None = None) -> dict[str, Any]:
     if env_path.exists():
         load_dotenv(dotenv_path=env_path, override=True)
     else:
-        # If frozen and .env is missing, attempt to copy .env.example
-        if getattr(sys, "frozen", False):
-            bundled_env = get_bundled_dir() / ".env.example"
-            if bundled_env.exists() and not env_path.exists():
-                try:
-                    import shutil
-                    shutil.copy2(bundled_env, env_path)
-                    logger.info("Copied initial .env template to %s", env_path)
-                except Exception as e:
-                    logger.warning("Could not create initial .env: %s", e)
         load_dotenv(override=True)
 
     cfg_file = config_path or (BASE_DIR / "config.yaml")
@@ -223,28 +213,29 @@ def validate_env() -> None:
     model_val = os.getenv(model_var, "").strip()
 
     if not key_val:
-        print(f"Error: LLM_PROVIDER={provider} but {key_var} is empty. Please set it in .env", file=sys.stderr)
+        print(f"Error: LLM_PROVIDER={provider} but {key_var} is empty. Please configure it in Settings or set it in .env", file=sys.stderr)
         sys.exit(1)
 
     if not model_val:
-        print(f"Error: LLM_PROVIDER={provider} but {model_var} is empty. Please set it in .env", file=sys.stderr)
+        print(f"Error: LLM_PROVIDER={provider} but {model_var} is empty. Please configure it in Settings or set it in .env", file=sys.stderr)
         sys.exit(1)
 
     fallback = os.getenv("FALLBACK_PROVIDER", "").strip().lower()
-    if fallback:
+    if fallback and fallback not in ("none", "off", "disabled"):
         if fallback not in valid_providers:
             print(
-                f"Error: Invalid FALLBACK_PROVIDER='{fallback}'. Must be one of: {', '.join(sorted(valid_providers))}.",
+                f"Error: Invalid FALLBACK_PROVIDER='{fallback}'. Must be one of: {', '.join(sorted(valid_providers))} or 'none'.",
                 file=sys.stderr,
             )
             sys.exit(1)
         fb_key_var = key_env_map[fallback]
         fb_model_var = model_env_map[fallback]
         if not os.getenv(fb_key_var, "").strip():
-            print(f"Error: FALLBACK_PROVIDER={fallback} but {fb_key_var} is empty. Please set it in .env", file=sys.stderr)
+            print(f"Error: FALLBACK_PROVIDER={fallback} but {fb_key_var} is empty. Please configure it in Settings or set it in .env", file=sys.stderr)
             sys.exit(1)
-        if not os.getenv(fb_model_var, "").strip():
-            print(f"Error: FALLBACK_PROVIDER={fallback} but {fb_model_var} is empty. Please set it in .env", file=sys.stderr)
+        fb_model_val = os.getenv("FALLBACK_MODEL", "").strip() or os.getenv(fb_model_var, "").strip()
+        if not fb_model_val:
+            print(f"Error: FALLBACK_PROVIDER={fallback} but model name is empty. Please configure it in Settings or set it in .env", file=sys.stderr)
             sys.exit(1)
 
 

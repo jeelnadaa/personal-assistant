@@ -93,8 +93,7 @@ class ActivePopupCard(QWidget):
             | Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setMinimumWidth(440)
-        self.setMaximumWidth(460)
+        self.setFixedWidth(460)
 
         self._drag_start_pos: QtCore.QPoint | None = None
         self._custom_positioned = False
@@ -365,9 +364,8 @@ class ActivePopupCard(QWidget):
         screen = QApplication.primaryScreen()
         if screen:
             geo = screen.availableGeometry()
-            hint = self.sizeHint()
-            w = max(self.width(), hint.width(), 440)
-            h = max(self.height(), hint.height())
+            w = 460
+            h = max(self.sizeHint().height(), self.height(), 100)
             if not getattr(self, "_custom_positioned", False):
                 x = geo.x() + (geo.width() - w) // 2
                 y = geo.y() + geo.height() - h - 16
