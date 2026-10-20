@@ -214,9 +214,19 @@ class JarvisTray:
         except Exception as e:
             logger.warning("Could not toggle pill visibility: %s", e)
 
+    def _on_settings_clicked(self, icon: pystray.Icon, item: Any) -> None:
+        """Opens the In-App Settings window."""
+        logger.info("Tray menu: Settings clicked.")
+        try:
+            from jarvis.ui.overlay import get_overlay
+            get_overlay().open_settings()
+        except Exception as e:
+            logger.warning("Could not open settings window: %s", e)
+
     def _build_menu(self) -> pystray.Menu:
         """Constructs the system tray context menu."""
         return pystray.Menu(
+            pystray.MenuItem("Settings...", self._on_settings_clicked, default=True),
             pystray.MenuItem("Status", self._on_status_clicked),
             pystray.MenuItem(
                 lambda item: "Resume listening" if self.is_paused else "Pause listening",

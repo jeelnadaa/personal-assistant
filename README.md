@@ -68,75 +68,83 @@ Jarvis is configured to run entirely local, privacy-first audio and voice proces
 
 ---
 
-## Quickstart & Installation
+## Portable Windows Release (No Python Installation Required)
 
-### 1. Requirements
-- Windows 11 (64-bit)
-- Python 3.11+
-- NVIDIA GPU with CUDA drivers (optional, automatic CPU fallback provided)
-- Dependencies installed:
-  ```powershell
-  python -m pip install -r requirements.txt
-  ```
+Jarvis is distributed as a fully standalone portable Windows distribution:
+**`dist/Jarvis-Portable-Windows.zip`**
 
-### 2. Configuration
-Copy the template `.env.example` to `.env`:
-```powershell
-copy .env.example .env
-```
-Open `.env` and set your active provider and API key:
-```ini
-LLM_PROVIDER=groq
-GROQ_MODEL=qwen/qwen3.8-27b
-GROQ_API_KEY=your_key_here
-```
-> **Guidance on LLM Selection**: Small, fast models can be weak at multi-step PC control and tool-calling. For reliable desktop actions, use a strong tool-calling model (e.g. Claude Sonnet 3.5/3.7, Gemini 2.5 Flash / Pro, or Qwen 3.8 27B / Llama 3.3 70B).
-
-### 3. Local Voice & Model Setup
-Run the pre-flight setup check to verify your environment and automatically validate Piper TTS and local STT:
-```powershell
-python scripts/setup_check.py
-```
-To download or change Piper voices:
-1. Voices are stored in `data/piper_voices/`.
-2. The default model is `en_GB-alan-medium.onnx` and `en_GB-alan-medium.onnx.json` from [rhasspy/piper](https://github.com/rhasspy/piper).
-3. Update `audio.piper_model_path` in `config.yaml` to switch voices.
+### Running Portable Jarvis:
+1. Extract `Jarvis-Portable-Windows.zip` to any folder on your PC.
+2. Double-click `jarvis.exe` to run.
+   - **No Python, pip, or virtual environment is required.**
+   - All runtime libraries (PySide6, native CTranslate2 CUDA drivers, PortAudio, OpenWakeWord, Piper TTS, and Satoshi typography) are bundled inside.
 
 ---
 
-## Standalone Executable & Rebuilding
+## In-App Settings & Configuration
 
-Jarvis can be compiled into a standalone Windows executable (`dist/jarvis.exe`) that bundles all dependencies (PySide6, CTranslate2, faster-whisper, openWakeWord, Piper TTS, pystray, Playwright) into a single portable binary.
+All configuration is managed visually inside the app—**no `.env` or manual file editing required**:
 
-### Command to Rebuild the App
-To compile or re-compile the standalone executable:
+- **Open Settings**:
+  - Right-click the **Floating Idle Pill** -> **Settings...**
+  - Right-click the **System Tray Icon** -> **Settings...**
+  - Or launch directly via command line:
+    ```powershell
+    jarvis.exe --settings
+    ```
+- **8 Dedicated Configuration Sections**:
+  1. **General**: User name, honorific (`sir`, `boss`, etc.), wake word phrase, sensitivity threshold, default search engine, and floating pill visibility.
+  2. **STT (Speech-to-Text)**: Choose Groq Cloud Whisper or offline faster-whisper; select local models, compute precision (`float16` / `int8`), and input microphone device.
+  3. **TTS (Text-to-Speech)**: Choose Microsoft Edge Cloud Neural (`en-GB-RyanNeural`), Piper local offline neural (`en_GB-alan-medium`), or Windows SAPI5; adjust speech speed multiplier (e.g. 1.15x for human conversational pacing).
+  4. **LLM / Brain**: Choose primary provider (Groq, Anthropic, Gemini), models, fallback providers, temperature, and token budgets.
+  5. **API & Credentials**: Securely set Groq, Anthropic, Gemini, or ElevenLabs API keys. Protected using **Windows DPAPI** encryption (`%LOCALAPPDATA%\Jarvis\vault.bin`)—secrets are never stored in plaintext or logged.
+  6. **Local Models**: View discovered Piper voices, local Whisper STT models, and local GGUF models; open model directories in Windows Explorer with one click.
+  7. **Performance & Hardware**: Real-time CUDA GPU, VRAM, system RAM, and CPU core diagnostics; toggle CPU-only fallback.
+  8. **Setup Guides & Help**: Step-by-step setup guides, official documentation links, download instructions, and troubleshooting tips for all supported providers.
+
+---
+
+## AI Model Management & Storage
+
+To keep application updates lightweight, AI models are separated from the executable and stored in your Windows user profile:
+- **Faster-Whisper STT**: `%LOCALAPPDATA%\Jarvis\models\stt`
+- **Piper Neural TTS**: `%LOCALAPPDATA%\Jarvis\models\piper`
+- **Local LLMs (GGUF)**: `%LOCALAPPDATA%\Jarvis\models\llm`
+
+### Dynamic Model Discovery Rules:
+Local model dropdowns **strictly discover models physically present and verified on disk**:
+- Piper: requires both `<voice>.onnx` and `<voice>.onnx.json` metadata.
+- Faster-Whisper: requires directory with `model.bin` (or `model.safetensors`) and `config.json`.
+- Local LLMs: scans for valid `.gguf` weights and queries local Ollama instances (`http://localhost:11434`).
+- Nonexistent or incomplete models are never shown as selectable options.
+
+---
+
+## Interactive UI & Shortcuts
+
+- **Draggable UI**: Click and drag anywhere on the **Floating Idle Pill** or the **Active Popup Card** to reposition it on your screen.
+- **Reset Position**: Double-click the card or floating pill to snap it back to the bottom-center above the Windows taskbar.
+- **Satoshi Typography**: Bundled font applied consistently across all cards, dialogs, pills, and settings tabs.
+- **Answer Shortcuts**:
+  - `Esc`: Close answer card and return to idle state.
+  - `Ctrl + C`: Copy assistant answer text to system clipboard with visual feedback.
+- **Emergency Kill Switch**: `Ctrl + Alt + J` instantly aborts active tool execution, LLM thinking, or speech playback.
+
+---
+
+## Building & Reproducing the Portable Distribution
+
+To compile the standalone portable `onedir` distribution and generate `Jarvis-Portable-Windows.zip`:
 ```powershell
-python scripts/build_exe.py
+python scripts/build_portable_zip.py
 ```
-To perform a clean rebuild from scratch:
+To clean build artifacts before compiling:
 ```powershell
-python scripts/build_exe.py --clean
+python scripts/build_portable_zip.py --clean
 ```
-
-### In-App Configuration (No Rebuilding Required)
-You **never** need to recompile the executable to change settings. Jarvis dynamically reads its configuration from the files adjacent to `jarvis.exe`:
-- **`dist/config.yaml`**: Edit wake phrase, STT/TTS engine, volume, speech rate, search engine, and UI preferences.
-- **`dist/.env`**: Edit API keys, active LLM provider, and model names.
-- **`dist/data/`**: Holds your persistent SQLite memory (`memory.db`), application index cache (`apps_cache.json`), and offline Piper voice models (`piper_voices/`).
-
-### System Tray Resident Operation
-When launched, `jarvis.exe` minimizes to the Windows System Tray (Taskbar Notification Area):
-- The animated PySide6 overlay appears only when listening, processing, speaking, or asking for confirmation.
-- The assistant stays alive in the system tray even when the overlay window is hidden.
-- Right-click the Jarvis tray icon for instant in-app management:
-  - **Status**: View active provider, model, wake phrase, and audio status.
-  - **Configure (config.yaml)**: Opens `config.yaml` in your default text editor.
-  - **Configure Keys (.env)**: Opens `.env` in Notepad for easy API key edits.
-  - **Reload Configuration**: Live-reloads settings and wake words into memory without restarting!
-  - **Toggle Console Window**: Shows or hides the attached command prompt window for viewing live logs.
-  - **Open Data / Logs Folder**: One-click access to stored memories, voice models, and audit logs.
-  - **Stop Current Task (Ctrl+Alt+J)**: Instantly halts active tools or speech.
-  - **Quit Jarvis**: Cleanly tears down the assistant and releases system resources.
+Outputs:
+- Distribution Directory: `dist/Jarvis-Portable-Windows/`
+- Portable Archive: `dist/Jarvis-Portable-Windows.zip` (ready for distribution)
 
 ---
 

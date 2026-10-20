@@ -5,6 +5,7 @@ with low latency and minimal resource consumption.
 """
 
 from pathlib import Path
+import sys
 import threading
 from typing import Any, Generator
 import urllib.request
@@ -33,15 +34,32 @@ def get_available_voices() -> list[str]:
 
 
 def ensure_voice_downloaded(voice_name: str = DEFAULT_VOICE) -> tuple[Path, Path]:
-    """Ensures that the ONNX model and JSON config for the voice exist, downloading if needed."""
+    """Ensures that the ONNX model and JSON config for the voice exist across user and bundled paths."""
+    from jarvis.models.discovery import get_piper_models_dir
+
+    search_dirs = [
+        get_piper_models_dir(),
+        PIPER_VOICES_DIR,
+    ]
+    if hasattr(sys, "_MEIPASS"):
+        search_dirs.append(Path(sys._MEIPASS) / "data" / "piper_voices")
+    if getattr(sys, "frozen", False):
+        search_dirs.append(Path(sys.executable).resolve().parent / "data" / "piper_voices")
+
+    for folder in search_dirs:
+        m = folder / f"{voice_name}.onnx"
+        c = folder / f"{voice_name}.onnx.json"
+        if not c.exists():
+            alt_c = folder / f"{voice_name}.json"
+            if alt_c.exists():
+                c = alt_c
+        if m.exists() and c.exists():
+            return m, c
+
+    logger.info("Piper voice '%s' not found locally. Initiating download to %s...", voice_name, PIPER_VOICES_DIR)
     PIPER_VOICES_DIR.mkdir(parents=True, exist_ok=True)
     model_path = PIPER_VOICES_DIR / f"{voice_name}.onnx"
     config_path = PIPER_VOICES_DIR / f"{voice_name}.onnx.json"
-
-    if model_path.exists() and config_path.exists():
-        return model_path, config_path
-
-    logger.info("Piper voice '%s' not found locally. Initiating download...", voice_name)
 
     # Currently supports en_GB-alan-medium automatic download
     if voice_name == "en_GB-alan-medium":
@@ -52,7 +70,7 @@ def ensure_voice_downloaded(voice_name: str = DEFAULT_VOICE) -> tuple[Path, Path
     else:
         raise FileNotFoundError(
             f"Voice '{voice_name}' is not downloaded. Place '{voice_name}.onnx' and "
-            f"'{voice_name}.onnx.json' in '{PIPER_VOICES_DIR}'."
+            f"'{voice_name}.onnx.json' in '{get_piper_models_dir()}' or '{PIPER_VOICES_DIR}'."
         )
 
     return model_path, config_path

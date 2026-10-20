@@ -82,3 +82,33 @@
 - **System Tray Persistence**: Called `qt_app.setQuitOnLastWindowClosed(False)` on `QApplication` ensuring Qt's event loop and the `pystray` system tray remain active indefinitely when the floating PySide6 overlay hides in IDLE state.
 - **Tray In-App Management**: Expanded `jarvis/ui/tray.py` with shortcuts to edit `config.yaml`, edit `.env`, trigger live config reload, toggle the attached console window, and open data/logs directories in Windows Explorer.
 
+## Phase 11 Decisions (Portable Distribution, In-App Settings, Model Discovery, DPAPI Vault, Satoshi Typography & Draggable UI)
+- **PyInstaller onedir Distribution (`dist/Jarvis-Portable-Windows.zip`)**:
+  - Preferred `onedir` distribution over `onefile` for heavy AI dependencies (PySide6, CTranslate2, PortAudio, ONNX models). `onedir` eliminates runtime archive extraction latency (< 1s startup vs 15-30s decompression delay on every run) and resolves DLL path loading with native Windows efficiency.
+  - The portable ZIP extracts directly to any folder; requires no Python installation, pip packages, virtual environments, or admin permissions.
+- **Hardware-Backed Windows DPAPI Credential Vault (`jarvis/security/vault.py`)**:
+  - API keys and secrets are protected using Windows Data Protection API (`win32crypt.CryptProtectData` and `CryptUnprotectData`).
+  - Stored in `%LOCALAPPDATA%\Jarvis\vault.bin` bound to the current Windows user profile. Secrets are never stored in plaintext configuration files or exposed in logs.
+  - Providers (`GroqProvider`, `GeminiProvider`, `AnthropicProvider`) retrieve keys seamlessly via `get_secret()` with fallback to active process environment variables.
+- **Centralized Persistent Settings Architecture (`jarvis/settings.py`)**:
+  - Configured `%LOCALAPPDATA%\Jarvis\settings.json` as the persistent source of truth across application updates and executable upgrades.
+  - Bi-directional synchronization: settings save to disk, update the in-memory `config` dictionary, and propagate environment variables (`HONORIFIC`, `WAKEWORD_PHRASE`, `STT_PROVIDER`, `TTS_PROVIDER`, `LLM_PROVIDER`, etc.) without requiring restart where supported.
+- **Strict Dynamic Model Discovery (`jarvis/models/discovery.py`)**:
+  - Local model dropdowns strictly display models physically verified on disk:
+    - Piper: requires both `<voice>.onnx` and companion `<voice>.onnx.json` metadata.
+    - Faster-Whisper: requires directory containing `model.bin` / `model.safetensors` and `config.json`.
+    - Local LLMs: scans for valid `.gguf` weight files and queries active local Ollama HTTP endpoints.
+  - Nonexistent, remote, or incomplete models are excluded from local dropdowns.
+- **User-Writable Model Provisioning**:
+  - Automatically initializes `%LOCALAPPDATA%\Jarvis\models` with subdirectories `stt/`, `piper/`, and `llm/` on first launch.
+  - Provides instant "Open Folder" and "Copy Path" buttons in the Settings UI so users can add models without touching code or rebuilding the EXE.
+- **Real-Time Hardware Diagnostics (`jarvis/system/hardware.py`)**:
+  - Real-time detection of CUDA-capable GPUs, VRAM capacity, host RAM, and CPU core counts via CTranslate2 and Windows WMI.
+  - Exposes GPU status in the Performance settings tab and setup check.
+- **Consistent Satoshi Typography (`jarvis/ui/fonts.py`)**:
+  - Bundled official Fontshare Satoshi OTF font files (`Satoshi-Regular.otf`, `Satoshi-Medium.otf`, `Satoshi-Bold.otf`) under `jarvis/resources/fonts/`.
+  - Registered via `QFontDatabase.addApplicationFont` and applied globally (`app.setFont(QFont("Satoshi"))`) across all dialogs, settings tabs, floating pill, and cards.
+- **Draggable UI Positioning**:
+  - Added full mouse drag handling (`mousePressEvent`, `mouseMoveEvent`, `mouseReleaseEvent`) to both `ActivePopupCard` and `IdlePillWidget`.
+  - Double-clicking either widget resets position back to the default bottom-center screen alignment above the Windows taskbar.
+

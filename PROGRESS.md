@@ -60,4 +60,16 @@
   - Wake word barge-in during Transcribing state: saying "Hey Jarvis" while transcribing or thinking cancels ongoing task and immediately switches state to Listening.
   - Verified across `python main.py` and standalone `dist/jarvis.exe`.
   - All 96 tests passing across full test suite.
+- [x] **Phase 11: Fully Portable Windows Distribution, In-App Settings, Model Discovery, DPAPI Vault, Satoshi Typography & Draggable UI**
+  - **Portable Windows ZIP (`dist/Jarvis-Portable-Windows.zip`)**: Fully self-contained `onedir` distribution runnable on any compatible Windows 11 machine without Python, pip, or virtual environment.
+  - **In-App Centralized Settings (`jarvis/ui/settings_window.py`)**: 8-tab configuration window for General, STT, TTS, LLM/Brain, API & Credentials, Local Models, Performance & Hardware Diagnostics, and Setup Guides. Launchable via `--settings` or tray/pill context menus.
+  - **Secure DPAPI Credential Vault (`jarvis/security/vault.py`)**: Hardware-backed Windows DPAPI encryption stored at `%LOCALAPPDATA%\Jarvis\vault.bin`. Secrets are never saved in plaintext settings files or logged.
+  - **Persistent Settings Manager (`jarvis/settings.py`)**: Runtime source of truth saved to `%LOCALAPPDATA%\Jarvis\settings.json` that survives executable updates.
+  - **Dynamic Model Discovery (`jarvis/models/discovery.py`)**: Strictly populates dropdowns with verified, downloaded models on disk (Piper `.onnx` + `.onnx.json`, Faster-Whisper `model.bin` + `config.json`, Local GGUF LLMs).
+  - **Auto Model Directory Provisioning**: Automatically initializes `%LOCALAPPDATA%\Jarvis\models` (`stt/`, `piper/`, `llm/`) with Open Folder / Copy Path actions.
+  - **Real-Time Hardware Diagnostics (`jarvis/system/hardware.py`)**: Inspects CUDA GPU, VRAM, RAM, and CPU cores in real-time.
+  - **Built-In Contextual Guides**: In-app documentation and step-by-step model setup guides for Piper, local Whisper, GGUF/Ollama, Groq, Gemini, and Anthropic.
+  - **Satoshi Typography (`jarvis/ui/fonts.py`)**: Bundled official Satoshi font family applied across all application windows, floating pill, and cards.
+  - **Draggable UI**: Both the Active Popup Card and Idle Floating Pill can be dragged anywhere on screen with double-click reset to bottom center.
+  - **Full Test Suite Passing**: 101 automated unit tests passing (`tests/test_settings_and_models.py` included).
 

@@ -75,6 +75,7 @@ class OverlayBridge(QtCore.QObject):
     sig_hide = Signal()
     sig_show = Signal()
     sig_set_pill_visible = Signal(bool)
+    sig_open_settings = Signal()
 
 
 class ActivePopupCard(QWidget):
@@ -95,6 +96,9 @@ class ActivePopupCard(QWidget):
         self.setMinimumWidth(440)
         self.setMaximumWidth(460)
 
+        self._drag_start_pos: QtCore.QPoint | None = None
+        self._custom_positioned = False
+
         self._init_ui()
         self._init_shortcuts()
 
@@ -113,7 +117,7 @@ class ActivePopupCard(QWidget):
                 border-radius: 8px;
             }
             QLabel {
-                font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+                font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
             }
             """
         )
@@ -123,6 +127,11 @@ class ActivePopupCard(QWidget):
         shadow.setOffset(0, 8)
         self.container.setGraphicsEffect(shadow)
         self.root_layout.addWidget(self.container)
+
+        # Delegate container mouse events for effortless dragging
+        self.container.mousePressEvent = self.mousePressEvent
+        self.container.mouseMoveEvent = self.mouseMoveEvent
+        self.container.mouseReleaseEvent = self.mouseReleaseEvent
 
         self.container_layout = QVBoxLayout(self.container)
         self.container_layout.setContentsMargins(16, 14, 16, 14)
@@ -136,6 +145,7 @@ class ActivePopupCard(QWidget):
         self.listen_mic = MicIconWidget(size=20, color="#FFFFFF", parent=self)
         self.listen_label = QLabel("Listening...", self)
         self.listen_label.setStyleSheet("font-size: 15px; color: #FFFFFF;")
+        self.listen_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.waveform_bars = WaveformBarsWidget(self)
         listen_layout.addWidget(self.listen_mic, alignment=Qt.AlignmentFlag.AlignVCenter)
         listen_layout.addWidget(self.listen_label, 1, alignment=Qt.AlignmentFlag.AlignVCenter)
@@ -151,6 +161,7 @@ class ActivePopupCard(QWidget):
         self.transcribe_label = QLabel("Transcribing...", self)
         self.transcribe_label.setStyleSheet("font-size: 15px; color: #FFFFFF;")
         self.transcribe_label.setWordWrap(True)
+        self.transcribe_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         trans_layout.addWidget(self.spinner, alignment=Qt.AlignmentFlag.AlignVCenter)
         trans_layout.addWidget(self.transcribe_label, 1, alignment=Qt.AlignmentFlag.AlignVCenter)
         self.container_layout.addWidget(self.transcribing_widget)
@@ -164,6 +175,7 @@ class ActivePopupCard(QWidget):
         self.ans_query_label = QLabel("", self)
         self.ans_query_label.setStyleSheet("font-size: 13px; color: #A8A8A8;")
         self.ans_query_label.setWordWrap(True)
+        self.ans_query_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
         self.ans_text_label = QLabel("", self)
         self.ans_text_label.setStyleSheet("font-size: 16px; line-height: 1.45; color: #FFFFFF;")
@@ -272,7 +284,26 @@ class ActivePopupCard(QWidget):
 
     def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
         self.setFocus()
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_start_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
         super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:
+        if event.buttons() & Qt.MouseButton.LeftButton and getattr(self, "_drag_start_pos", None):
+            new_pos = event.globalPosition().toPoint() - self._drag_start_pos
+            self.move(new_pos)
+            self._custom_positioned = True
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_start_pos = None
+        super().mouseReleaseEvent(event)
+
+    def mouseDoubleClickEvent(self, event: QtGui.QMouseEvent) -> None:
+        """Resets popup card to default bottom-center position on double click."""
+        self._custom_positioned = False
+        self.reposition_above_taskbar()
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
         """Fallback keyPress handler ensuring Esc closes and Ctrl+C copies."""
@@ -330,16 +361,23 @@ class ActivePopupCard(QWidget):
         self.reposition_above_taskbar()
 
     def reposition_above_taskbar(self) -> None:
-        """Positions card horizontally centered, anchored above taskbar."""
+        """Positions card horizontally centered, anchored above taskbar (or maintains custom position)."""
         screen = QApplication.primaryScreen()
         if screen:
             geo = screen.availableGeometry()
             hint = self.sizeHint()
             w = max(self.width(), hint.width(), 440)
             h = max(self.height(), hint.height())
-            x = geo.x() + (geo.width() - w) // 2
-            y = geo.y() + geo.height() - h - 16
-            self.setGeometry(x, y, w, h)
+            if not getattr(self, "_custom_positioned", False):
+                x = geo.x() + (geo.width() - w) // 2
+                y = geo.y() + geo.height() - h - 16
+                self.setGeometry(x, y, w, h)
+            else:
+                curr_x = self.x()
+                curr_y = self.y()
+                clamped_x = max(geo.x(), min(curr_x, geo.x() + geo.width() - w))
+                clamped_y = max(geo.y(), min(curr_y, geo.y() + geo.height() - h))
+                self.setGeometry(clamped_x, clamped_y, w, h)
 
     def close_to_idle(self) -> None:
         """Dismisses the popup card and returns to idle floating pill."""
@@ -390,10 +428,12 @@ class JarvisOverlay(QWidget):
         self.bridge.sig_hide.connect(self.hide)
         self.bridge.sig_show.connect(self.show)
         self.bridge.sig_set_pill_visible.connect(self.set_idle_pill_visible)
+        self.bridge.sig_open_settings.connect(self._show_settings_window)
 
         self._show_idle_pill = bool(config.get("ui", {}).get("show_idle_pill", True))
         self.current_state = "IDLE"
         self.last_query = ""
+        self._settings_window: Any = None
 
         # Compatibility widgets for tests
         self.title_label = QLabel("Jarvis", self)
@@ -415,6 +455,7 @@ class JarvisOverlay(QWidget):
         self.idle_pill = IdlePillWidget(
             on_wake=self._on_pill_wake,
             on_hide_pill=lambda: self.set_idle_pill_visible(False),
+            on_open_settings=self.open_settings,
         )
 
         self.on_wake_handler = on_wake
@@ -571,6 +612,20 @@ class JarvisOverlay(QWidget):
 
         self.bridge.sig_set_state.emit("IDLE", "", "")
         return self._confirm_result
+
+    def open_settings(self) -> None:
+        """Emits thread-safe signal to open the In-App Settings window on the Qt GUI thread."""
+        self.bridge.sig_open_settings.emit()
+
+    @Slot()
+    def _show_settings_window(self) -> None:
+        """Instantiates and displays the SettingsWindow on the main Qt GUI thread."""
+        if self._settings_window is None:
+            from jarvis.ui.settings_window import SettingsWindow
+            self._settings_window = SettingsWindow()
+        self._settings_window.show()
+        self._settings_window.raise_()
+        self._settings_window.activateWindow()
 
 
 # Singleton holder

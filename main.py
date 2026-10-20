@@ -191,10 +191,16 @@ from jarvis.setup_check import run_all_checks
 def run_voice_gui_mode(show_console: bool = False) -> None:
     """Launches full voice mode with PySide6 overlay and system tray."""
     from PySide6 import QtCore, QtWidgets
+    from jarvis.models.discovery import ensure_model_directories
+    from jarvis.ui.fonts import setup_satoshi_font
 
     qt_app = QtWidgets.QApplication.instance()
     if qt_app is None:
         qt_app = QtWidgets.QApplication(sys.argv)
+
+    # Configure Satoshi typography and ensure model directories exist
+    setup_satoshi_font(qt_app)
+    ensure_model_directories()
 
     # CRITICAL: Keep Qt application event loop alive in the system tray when overlay is hidden!
     qt_app.setQuitOnLastWindowClosed(False)
@@ -300,7 +306,25 @@ def main() -> None:
         action="store_true",
         help="Disable automatic crash recovery supervisor loop.",
     )
+    parser.add_argument(
+        "--settings",
+        action="store_true",
+        help="Launch the In-App Settings configuration window directly.",
+    )
     args = parser.parse_args()
+
+    if args.settings:
+        from PySide6 import QtWidgets
+        from jarvis.models.discovery import ensure_model_directories
+        from jarvis.ui.fonts import setup_satoshi_font
+        from jarvis.ui.settings_window import SettingsWindow
+
+        qt_app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
+        setup_satoshi_font(qt_app)
+        ensure_model_directories()
+        win = SettingsWindow()
+        win.show()
+        sys.exit(qt_app.exec())
 
     if args.show_config:
         print_config_summary()

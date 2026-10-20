@@ -13,6 +13,7 @@ from jarvis.brain.providers.base import (
     Msg,
     ToolCall,
 )
+from jarvis.security.vault import get_secret
 from jarvis.logger import logger
 
 
@@ -46,7 +47,7 @@ class GeminiProvider(LLMProvider):
     def __init__(self, model: str | None = None, api_key: str | None = None) -> None:
         self.name = "gemini"
         self.model = model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-        key = api_key or os.getenv("GEMINI_API_KEY", "")
+        key = api_key or get_secret("GEMINI_API_KEY", "")
         self.client = genai.Client(api_key=key) if key else None
         self.supports_vision = True
         self.supports_tools = True

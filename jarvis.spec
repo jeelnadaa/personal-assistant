@@ -1,13 +1,18 @@
 # -*- mode: python ; coding: utf-8 -*-
 """PyInstaller build specification for Jarvis AI Assistant.
 
-Bundles all runtime dependencies, native libraries (ctranslate2, PortAudio),
-ONNX models (openwakeword), phoneme databases (piper), and Qt plugins into a
-standalone Windows executable.
+Produces a fully self-contained portable 'onedir' Windows distribution in:
+  dist/Jarvis-Portable-Windows/
+Bundling:
+  - Python runtime & PySide6 UI framework
+  - Native libraries (ctranslate2, PortAudio, win32crypt, DPAPI)
+  - OpenWakeWord models & Piper neural voice runtime
+  - Bundled Satoshi typography and essential UI assets
+  - Centralized settings, model discovery, hardware diagnostics, and crash handlers.
 """
 
-import sys
 from pathlib import Path
+import sys
 from PyInstaller.utils.hooks import (
     collect_data_files,
     collect_dynamic_libs,
@@ -24,10 +29,26 @@ datas = [
     (str(workspace_root / "config.yaml"), "."),
     (str(workspace_root / ".env.example"), "."),
 ]
+
+# Fonts
+fonts_dir = workspace_root / "jarvis" / "resources" / "fonts"
+if fonts_dir.exists():
+    for f in fonts_dir.glob("*"):
+        if f.is_file():
+            datas.append((str(f), "jarvis/resources/fonts"))
+
+# Piper voices if present
+piper_dir = workspace_root / "data" / "piper_voices"
+if piper_dir.exists():
+    for f in piper_dir.glob("*"):
+        if f.is_file():
+            datas.append((str(f), "data/piper_voices"))
+
 datas += collect_data_files("openwakeword")
 datas += collect_data_files("ctranslate2")
 datas += collect_data_files("faster_whisper")
 datas += collect_data_files("piper")
+datas += collect_data_files("PySide6")
 
 # 2. Collect native dynamic libraries (.dll)
 binaries = []
@@ -44,6 +65,21 @@ hiddenimports = [
     "jarvis.logger",
     "jarvis.crash_recovery",
     "jarvis.setup_check",
+    "jarvis.settings",
+    # Security and Vault (DPAPI)
+    "jarvis.security",
+    "jarvis.security.vault",
+    "win32crypt",
+    "win32api",
+    "win32con",
+    # Hardware & System
+    "jarvis.system",
+    "jarvis.system.hardware",
+    "wmi",
+    "psutil",
+    # Model management & discovery
+    "jarvis.models",
+    "jarvis.models.discovery",
     # Audio pipeline
     "jarvis.audio",
     "jarvis.audio.mic",
@@ -88,11 +124,18 @@ hiddenimports = [
     "jarvis.safety.policy",
     "jarvis.platform",
     "jarvis.platform.mutex",
-    # UI
+    # UI and typography
     "jarvis.ui",
+    "jarvis.ui.fonts",
     "jarvis.ui.overlay",
     "jarvis.ui.tray",
     "jarvis.ui.widgets",
+    "jarvis.ui.settings_window",
+    # PySide6 components
+    "PySide6",
+    "PySide6.QtCore",
+    "PySide6.QtGui",
+    "PySide6.QtWidgets",
     # System and third-party dependencies
     "ctranslate2",
     "faster_whisper",
@@ -169,22 +212,29 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name="jarvis",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    upx_exclude=[],
-    runtime_tmpdir=None,
-    console=True,  # Console is automatically hidden when voice mode is launched, and toggleable via tray
+    console=True,  # Console allows seeing CLI logs/help or runs hidden in background
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
     icon=None,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name="Jarvis-Portable-Windows",
 )

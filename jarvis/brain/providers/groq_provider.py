@@ -14,13 +14,16 @@ from jarvis.brain.providers.base import (
 from jarvis.logger import logger
 
 
+from jarvis.security.vault import get_secret
+
+
 class GroqProvider(LLMProvider):
     """Adapter for Groq-hosted open-weights models."""
 
     def __init__(self, model: str | None = None, api_key: str | None = None) -> None:
         self.name = "groq"
         self.model = model or os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-        key = api_key or os.getenv("GROQ_API_KEY", "")
+        key = api_key or get_secret("GROQ_API_KEY", "")
         self.client = groq.Groq(api_key=key, timeout=15.0) if key else None
 
         # Check vision support from env or model name

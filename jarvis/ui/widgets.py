@@ -147,11 +147,13 @@ class IdlePillWidget(QWidget):
         self,
         on_wake: Callable[[], None] | None = None,
         on_hide_pill: Callable[[], None] | None = None,
+        on_open_settings: Callable[[], None] | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.on_wake = on_wake
         self.on_hide_pill = on_hide_pill
+        self.on_open_settings = on_open_settings
 
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
@@ -242,6 +244,7 @@ class IdlePillWidget(QWidget):
         wake_act = menu.addAction("Wake Jarvis")
         hide_act = menu.addAction("Hide Floating Pill")
         menu.addSeparator()
+        settings_act = menu.addAction("Settings...")
         reset_act = menu.addAction("Reset Position")
 
         action = menu.exec(pos)
@@ -249,5 +252,7 @@ class IdlePillWidget(QWidget):
             self.on_wake()
         elif action == hide_act and self.on_hide_pill:
             self.on_hide_pill()
+        elif action == settings_act and self.on_open_settings:
+            self.on_open_settings()
         elif action == reset_act:
             self.position_at_bottom_center()

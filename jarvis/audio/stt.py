@@ -65,18 +65,26 @@ def _get_local_whisper_model() -> Any:
         return _LOCAL_WHISPER_MODEL
 
     from faster_whisper import WhisperModel
+    from jarvis.models.discovery import get_stt_models_dir
 
     model_size, device, compute_type = _resolve_stt_backend()
+    download_root = str(get_stt_models_dir())
 
     # Attempt primary configured device (CUDA preferred)
     try:
         logger.info(
-            "Loading local faster-whisper model '%s' on %s (precision: %s)...",
+            "Loading local faster-whisper model '%s' on %s (precision: %s, dir: %s)...",
             model_size,
             device,
             compute_type,
+            download_root,
         )
-        _LOCAL_WHISPER_MODEL = WhisperModel(model_size, device=device, compute_type=compute_type)
+        _LOCAL_WHISPER_MODEL = WhisperModel(
+            model_size,
+            device=device,
+            compute_type=compute_type,
+            download_root=download_root,
+        )
         _ACTIVE_DEVICE = device
         _ACTIVE_COMPUTE_TYPE = compute_type
         _ACTIVE_MODEL_NAME = model_size
@@ -86,7 +94,12 @@ def _get_local_whisper_model() -> Any:
         if device == "cuda":
             logger.warning("Failed to load faster-whisper on CUDA (%s). Falling back to CPU int8...", gpu_err)
             try:
-                _LOCAL_WHISPER_MODEL = WhisperModel(model_size, device="cpu", compute_type="int8")
+                _LOCAL_WHISPER_MODEL = WhisperModel(
+                    model_size,
+                    device="cpu",
+                    compute_type="int8",
+                    download_root=download_root,
+                )
                 _ACTIVE_DEVICE = "cpu"
                 _ACTIVE_COMPUTE_TYPE = "int8"
                 _ACTIVE_MODEL_NAME = model_size

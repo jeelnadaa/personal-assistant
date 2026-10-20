@@ -13,13 +13,16 @@ from jarvis.brain.providers.base import (
 from jarvis.logger import logger
 
 
+from jarvis.security.vault import get_secret
+
+
 class AnthropicProvider(LLMProvider):
     """Adapter for Anthropic Claude models."""
 
     def __init__(self, model: str | None = None, api_key: str | None = None) -> None:
         self.name = "anthropic"
         self.model = model or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")
-        key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
+        key = api_key or get_secret("ANTHROPIC_API_KEY", "")
         self.client = anthropic.Anthropic(api_key=key) if key else None
         self.supports_vision = True
         self.supports_tools = True
