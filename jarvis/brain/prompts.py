@@ -12,6 +12,8 @@ except ImportError:
 
 SYSTEM_PROMPT_TEMPLATE = """You are Jarvis, a voice assistant that controls the user's Windows 11 PC. You act by calling tools. Your replies are spoken aloud, so keep final answers short (1-2 sentences), plain, and friendly. No markdown, no lists, no emojis in final answers.
 
+{persona_section}
+
 HOW TO WORK
 1. Work out what the user wants. If the request is ambiguous in a way that could cause harm or waste effort, ask ONE short clarifying question instead of guessing. Otherwise act.
 2. Use the most reliable tool first. Order of preference: dedicated tools (open_app, set_volume, search_files, open_url) > UI automation (get_ui_elements, click_ui_element) > screenshot + vision (take_screenshot, find_and_click) > raw mouse/keyboard coordinates.
@@ -29,7 +31,7 @@ SAFETY
 - If a request seems unsafe or you are unsure, ask the user first.
 
 STYLE
-- Address the user naturally. Be concise: "Done, Chrome is open and I've searched for cheap flights to Goa."
+- Address the user naturally and respectfully. Keep responses concise (1-2 short spoken sentences).
 - If the user is just chatting or asks a question you can answer without tools, answer directly without calling any tool.
 
 USER MEMORY
@@ -65,7 +67,7 @@ def _get_screen_resolution() -> str:
 
 
 def build_system_prompt(memory_context: str | None = None) -> str:
-    """Constructs the system prompt with current environment state and memory filled in.
+    """Constructs the system prompt with current environment state, honorific, and memory filled in.
 
     Args:
         memory_context: Optional context override. Defaults to get_memory_context().
@@ -82,11 +84,30 @@ def build_system_prompt(memory_context: str | None = None) -> str:
     else:
         mem_text = memory_context
 
+    from jarvis.config import config
+
+    persona_cfg = config.get("persona", {})
+    honorific = os.getenv("HONORIFIC", persona_cfg.get("honorific", "")).strip()
+    user_name = os.getenv("USER_NAME", persona_cfg.get("user_name", "")).strip()
+
+    persona_lines = []
+    if honorific:
+        persona_lines.append(
+            f"HONORIFIC INSTRUCTION:\n"
+            f"- You MUST address the user using their chosen honorific: '{honorific}' (e.g. 'Right away, {honorific}.', 'Done, {honorific}. Calculator is now open.', 'Certainly, {honorific}.', 'It is 25, {honorific}.').\n"
+            f"- Always incorporate '{honorific}' naturally into your speech confirmations and replies."
+        )
+    if user_name:
+        persona_lines.append(f"USER IDENTITY:\n- The user's name is {user_name}.")
+
+    persona_section = "\n\n".join(persona_lines) if persona_lines else ""
+
     now_str = datetime.now().strftime("%Y-%m-%d %I:%M %p")
     screen_size = _get_screen_resolution()
     active_win = _get_active_window_title()
 
     return SYSTEM_PROMPT_TEMPLATE.format(
+        persona_section=persona_section,
         memory_context=mem_text.strip() or "None",
         datetime=now_str,
         screen_size=screen_size,

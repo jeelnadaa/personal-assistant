@@ -38,7 +38,7 @@ stt:
   compute_type: auto          # auto (float16 on cuda, int8 on cpu) | float16 | int8
 
 tts:
-  provider: piper             # piper (local offline neural) | edge (online neural) | pyttsx3 (SAPI5)
+  provider: edge              # edge (online neural cloud) | piper (local offline neural) | pyttsx3 (SAPI5)
   piper_voice: en_GB-alan-medium
   speed: 1.0                  # speech rate multiplier (1.0 = normal)
   fallback_engine: edge

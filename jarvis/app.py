@@ -42,6 +42,7 @@ class JarvisApp:
         # Audio components
         self.wake_detector = WakeWordDetector(on_detect=self._on_wake_detected)
         self.worker_thread: threading.Thread | None = None
+        self.turn_counter = 0
 
         # System tray
         self.enable_tray = enable_tray
@@ -81,6 +82,8 @@ class JarvisApp:
     def _on_kill_switch(self) -> None:
         """Handles emergency kill switch (Ctrl+Alt+J)."""
         logger.warning("Emergency kill switch engaged in state: %s", self.state.value)
+        with self.state_lock:
+            self.turn_counter += 1
         cancel_current_task()
         stop_speech()
         self._set_state(AppState.IDLE, "Stopped")
@@ -88,31 +91,64 @@ class JarvisApp:
         mic_stream.resume_wakeword()
 
     def _on_wake_detected(self) -> None:
-        """Triggered by openWakeWord when 'hey jarvis' is detected."""
-        if self.state != AppState.IDLE:
+        """Triggered when wake word is detected; interrupts any in-progress task and listens."""
+        if self.state == AppState.PAUSED:
             return
 
-        logger.info("Wake word detected! Entering LISTENING state.")
+        with self.state_lock:
+            # If Jarvis is currently working on something (speaking, thinking/processing, confirming)
+            if self.state in (AppState.PROCESSING, AppState.SPEAKING, AppState.CONFIRMING):
+                logger.info(
+                    "Wake word detected while working on a task in state %s. Interrupting current action and listening for new command...",
+                    self.state.value,
+                )
+                cancel_current_task()
+                stop_speech()
+            elif self.state == AppState.LISTENING:
+                # Already actively recording speech
+                return
+
+            self.turn_counter += 1
+            turn_id = self.turn_counter
+
+        logger.info("Wake word detected! Entering LISTENING state (Turn #%d).", turn_id)
         # Start voice processing cycle in worker thread so detector stays responsive
-        self.worker_thread = threading.Thread(target=self._process_voice_turn, daemon=True, name="VoiceWorker")
+        self.worker_thread = threading.Thread(
+            target=self._process_voice_turn,
+            args=(turn_id, False),
+            daemon=True,
+            name=f"VoiceWorker-{turn_id}",
+        )
         self.worker_thread.start()
 
-    def _process_voice_turn(self, is_followup: bool = False) -> None:
+    def _process_voice_turn(self, turn_id: int | None = None, is_followup: bool = False) -> None:
         """Records speech, transcribes, invokes agent loop, and speaks response."""
+        if turn_id is None:
+            with self.state_lock:
+                self.turn_counter += 1
+                turn_id = self.turn_counter
+
         reset_cancel_event()
         self._set_state(AppState.LISTENING, "Listening...")
 
         if not is_followup:
-            play_wake_sound(block=True)
+            play_wake_sound(block=False)
 
         audio_samples = mic_stream.record_until_silence()
         end_of_speech_time = time.perf_counter()
+
+        # Check if cancelled or superseded during recording
+        if turn_id != self.turn_counter or is_task_cancelled():
+            return
 
         if audio_samples is None or len(audio_samples) == 0:
             logger.info("Empty audio recording. Returning to IDLE.")
             play_error_sound(block=True)
             self._set_state(AppState.IDLE)
             return
+
+        # Resume wake word detection immediately so user can barge-in during thinking / tool execution
+        mic_stream.resume_wakeword()
 
         self._set_state(AppState.PROCESSING, "Transcribing...")
         user_text = transcribe(audio_samples)
@@ -121,14 +157,23 @@ class JarvisApp:
             self._set_state(AppState.IDLE)
             return
 
+        if turn_id != self.turn_counter or is_task_cancelled():
+            return
+
         logger.info("Transcribed User Speech: '%s'", user_text)
         self._set_state(AppState.PROCESSING, f"Thinking: '{user_text}'")
 
         # Execute agent loop
         def agent_progress(status: str) -> None:
-            self._set_state(AppState.PROCESSING, status)
+            if turn_id == self.turn_counter and not is_task_cancelled():
+                self._set_state(AppState.PROCESSING, status)
 
         reply = run_task(user_text, ui_callback=agent_progress)
+
+        # Check for cancellation before speaking
+        if turn_id != self.turn_counter or is_task_cancelled():
+            logger.info("Task cancelled or superseded before speaking.")
+            return
 
         # Log measured latency from speech end to response generation
         speech_to_reply_latency = time.perf_counter() - end_of_speech_time
@@ -138,24 +183,23 @@ class JarvisApp:
         )
         print(f"\n[Turnaround Latency]: {speech_to_reply_latency:.2f}s | Jarvis: {reply}\n")
 
-        # Check for cancellation before speaking
-        if is_task_cancelled():
-            self._set_state(AppState.IDLE)
-            return
-
-        # Speak response
+        # Speak response (ensure wakeword remains active for barge-in)
         self._set_state(AppState.SPEAKING, reply)
-        mic_stream.pause_wakeword()
+        mic_stream.resume_wakeword()
         try:
             speak(reply, block=True)
-            play_done_sound(block=False)
+            if turn_id == self.turn_counter and not is_task_cancelled():
+                play_done_sound(block=False)
         finally:
             mic_stream.resume_wakeword()
+
+        if turn_id != self.turn_counter or is_task_cancelled():
+            return
 
         # Support follow-up questions
         if reply.strip().endswith("?"):
             logger.info("Reply ended with question mark. Initiating automatic follow-up listening.")
-            self._process_voice_turn(is_followup=True)
+            self._process_voice_turn(turn_id, is_followup=True)
         else:
             self._set_state(AppState.IDLE)
 

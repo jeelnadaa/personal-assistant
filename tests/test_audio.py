@@ -105,3 +105,51 @@ def test_app_voice_turn_flow(monkeypatch):
     assert "PROCESSING" in transitions
     assert "SPEAKING" in transitions
 
+
+def test_wakeword_interrupts_ongoing_task(monkeypatch):
+    """Verifies that saying wake word while Jarvis is working interrupts the task and restarts listening."""
+    from jarvis.app import JarvisApp, AppState
+    from jarvis.brain.agent import is_task_cancelled
+
+    stopped_speech = []
+    monkeypatch.setattr("jarvis.app.stop_speech", lambda: stopped_speech.append(True))
+    worker_started = []
+    monkeypatch.setattr("jarvis.app.JarvisApp._process_voice_turn", lambda self, turn_id=None, is_followup=False: worker_started.append(turn_id))
+
+    app = JarvisApp()
+    app.state = AppState.SPEAKING
+
+    # User says wake word again while Jarvis is speaking
+    app._on_wake_detected()
+
+    assert is_task_cancelled()
+    assert len(stopped_speech) == 1
+    assert app.turn_counter == 1
+
+
+def test_system_prompt_includes_honorific(monkeypatch):
+    """Verifies that HONORIFIC from .env or config is embedded in the system prompt."""
+    from jarvis.brain.prompts import build_system_prompt
+
+    monkeypatch.setenv("HONORIFIC", "sir")
+    prompt = build_system_prompt()
+    assert "HONORIFIC INSTRUCTION:" in prompt
+    assert "'sir'" in prompt
+
+    monkeypatch.setenv("HONORIFIC", "boss")
+    prompt_boss = build_system_prompt()
+    assert "'boss'" in prompt_boss
+
+
+def test_tts_cloud_provider(monkeypatch):
+    """Verifies that TTS_PROVIDER='cloud' or 'edge' routes to Edge-TTS."""
+    from jarvis.audio.tts import speak
+
+    edge_called = []
+    monkeypatch.setenv("TTS_PROVIDER", "cloud")
+    monkeypatch.setattr("jarvis.audio.tts._speak_with_edge", lambda text, block: edge_called.append(text) or True)
+
+    speak("Testing cloud speech", block=True)
+    assert len(edge_called) == 1
+    assert "Testing cloud speech" in edge_called[0]
+

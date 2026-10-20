@@ -23,6 +23,14 @@ TASK_CANCEL_EVENT = threading.Event()
 def cancel_current_task() -> None:
     """Signals the agent loop to cancel current task immediately."""
     TASK_CANCEL_EVENT.set()
+    try:
+        from jarvis.ui.overlay import get_overlay
+        overlay = get_overlay()
+        if hasattr(overlay, "_confirm_event"):
+            overlay._confirm_result = False
+            overlay._confirm_event.set()
+    except Exception:
+        pass
 
 
 def reset_cancel_event() -> None:

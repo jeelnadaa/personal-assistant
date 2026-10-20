@@ -137,15 +137,14 @@ def speak(text: str, block: bool = True) -> None:
     with _TTS_LOCK:
         succeeded = False
 
-        if provider == "piper":
-            succeeded = _speak_with_piper(clean_text, block=block)
-            if not succeeded and not _TTS_STOP_EVENT.is_set():
-                succeeded = _speak_with_edge(clean_text, block=block)
-
-        elif provider == "edge":
+        if provider in ("edge", "cloud"):
             succeeded = _speak_with_edge(clean_text, block=block)
             if not succeeded and not _TTS_STOP_EVENT.is_set():
                 succeeded = _speak_with_piper(clean_text, block=block)
+        elif provider == "piper":
+            succeeded = _speak_with_piper(clean_text, block=block)
+            if not succeeded and not _TTS_STOP_EVENT.is_set():
+                succeeded = _speak_with_edge(clean_text, block=block)
 
         # Emergency fallback: pyttsx3 Windows SAPI5
         if not succeeded and not _TTS_STOP_EVENT.is_set():
