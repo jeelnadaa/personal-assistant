@@ -1,0 +1,38 @@
+# Core LLM Providers
+anthropic>=0.30.0
+google-genai>=0.1.0
+groq>=0.9.0
+
+# Speech, Audio & Voice
+sounddevice>=0.4.6
+numpy>=1.24.0
+scipy>=1.10.0
+faster-whisper>=1.0.0
+edge-tts>=6.1.0
+pyttsx3>=2.90
+openwakeword>=0.5.0
+
+# Windows System & Automation
+psutil>=5.9.0
+pywin32>=306
+pywinauto>=0.6.8
+pyautogui>=0.9.54
+mss>=9.0.0
+Pillow>=10.0.0
+pyperclip>=1.8.2
+pycaw>=20240210
+comtypes>=1.2.0
+screen-brightness-control>=0.22.0
+send2trash>=1.8.0
+
+# Web & Browser
+playwright>=1.40.0
+
+# UI
+PySide6>=6.5.0
+pystray>=0.19.5
+
+# Config, Environment & Testing
+PyYAML>=6.0
+python-dotenv>=1.0.0
+pytest>=8.0.0

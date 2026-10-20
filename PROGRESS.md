@@ -1,0 +1,32 @@
+# Jarvis Implementation Progress
+
+- [x] **Phase 1: Skeleton + text brain**
+  - Project structure and foundation
+  - `config.py` and `logger.py`
+  - `tools/base.py` and registry
+  - Initial tools: `open_app`, `get_system_info`, `open_url`
+  - `brain/providers/` (Anthropic, Gemini, Groq) and `brain/llm.py`
+  - `brain/agent.py` and `brain/prompts.py`
+  - CLI in `main.py` using `--text` mode
+  - Tests: `tests/test_tools.py`, `tests/test_agent_loop.py`
+- [ ] **Phase 2: Full tool set**
+  - Implement apps, windows_mgmt, system, files, web, input_control, screen basics, clipboard, shell, memory_tools
+  - Comprehensive unit tests
+- [ ] **Phase 3: Safety layer**
+  - Policy enforcement (`policy.py`), interactive confirmation (`confirm.py`), audit log (`audit.py`)
+  - Ctrl+Alt+J kill switch, loop prevention, max actions cap
+- [ ] **Phase 4: Voice**
+  - Audio pipeline: `mic.py`, `wakeword.py`, `stt.py`, `tts.py`, `sounds.py`
+  - Integration with `app.py` state machine
+  - `scripts/check_mic.py`
+- [ ] **Phase 5: UI**
+  - PySide6 overlay (`overlay.py`) with pulsing orb, waveform, confirm buttons
+  - Tray icon and menu (`tray.py`)
+- [ ] **Phase 6: Screen vision**
+  - `screen.py` screenshot, scaling/DPI aware coordinate translation, UIA tools, vision click
+- [ ] **Phase 7: Memory + browser automation**
+  - SQLite long-term memory (`memory.py`)
+  - Playwright persistent browser automation
+- [ ] **Phase 8: Run on startup + polish**
+  - Windows startup registration script (`install_startup.py`)
+  - Named mutex single-instance lock, crash recovery, first-run setup check

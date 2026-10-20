@@ -1,0 +1,62 @@
+assistant_name: Jarvis
+
+llm:                          # provider + model names are NOT here, they live in .env
+  max_tokens: 1500
+  max_iterations: 25
+  temperature: 0.2
+  request_timeout_seconds: 60
+
+context:
+  recent_exchanges: 10        # how many past user/Jarvis exchanges to remember
+  expire_minutes: 30          # after this much silence, start a fresh conversation (long-term memory stays)
+  max_context_chars: 6000     # when exceeded, older exchanges get summarized
+  auto_learn_facts: true      # extract durable user preferences after tasks
+
+persona:
+  assistant_name: Jarvis
+  speak_progress_updates: true   # "Still working on it" after 8 s on long tasks
+  instant_acknowledgement: true  # say "On it." immediately, before the LLM answers
+
+audio:
+  input_device: null          # null = default mic
+  sample_rate: 16000
+  max_record_seconds: 20
+  silence_seconds: 1.2        # stop recording after this much silence
+  vad_aggressiveness: 2       # 0-3
+
+wakeword:
+  engine: openwakeword
+  phrase: hey_jarvis
+  threshold: 0.5
+  cooldown_seconds: 2
+
+stt:
+  engine: faster-whisper
+  model: small.en
+  device: cpu
+  compute_type: int8
+
+tts:                          # engine + voice are chosen in .env (TTS_PROVIDER etc.)
+  fallback_engine: pyttsx3
+  speak_replies: true
+  max_spoken_sentences: 2     # longer answers are shown in the overlay, only a short version is spoken
+  sentence_pause_ms: 180
+  cache_dir: data/tts_cache
+
+safety:
+  confirm_dangerous: true
+  confirm_method: voice       # voice | overlay_button | both
+  allowed_shell_commands: []  # empty = every shell command needs confirmation
+  protected_paths:
+    - C:\Windows
+    - C:\Program Files
+    - C:\Program Files (x86)
+  max_actions_per_task: 40
+
+ui:
+  overlay_position: bottom_center
+  overlay_timeout_seconds: 6
+  show_transcript: true
+
+modes:
+  text_mode: false            # true = type commands instead of voice (for debugging)
