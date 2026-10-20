@@ -40,4 +40,11 @@
 - **Unified Dual-Mode Confirmation**: Allow/Deny buttons on the overlay and voice confirmation listener (`_voice_confirm_worker`) both update a single `overlay._confirm_result` and trigger `overlay._confirm_event`, supporting both button clicks and spoken affirmative/negative responses (`yes`, `yeah`, `sure`, etc.) within a 15-second timeout.
 - **System Tray**: `pystray` icon running in a dedicated background daemon thread (`jarvis/ui/tray.py`), providing quick actions: Status, Pause/Resume listening, Text mode guidance, Open logs folder, Stop current task, and Clean Quit.
 
+## Phase 6 Decisions
+- **DPI Scaling & Coordinate Precision**: Set Windows process DPI awareness to Per-Monitor V2 (`SetProcessDpiAwareness(2)`). Screenshots are captured with `mss`, downscaled so the longest side is <= 1568px (`s = orig_w / sent_w`), and vision click coordinates are mapped back via `scale_coordinates(x, y, s)`. Validated on simulated 100%, 125%, and 150% displays.
+- **Older Screenshot Pruning**: In `jarvis/brain/agent.py`, `_prune_older_screenshots(messages, keep_count=3)` retains base64 images only on the 3 most recent screenshots, replacing earlier image data with a placeholder to conserve token usage while maintaining visual context.
+- **Native UI Automation First**: Dedicated tools `get_ui_elements` and `click_ui_element` leverage `pywinauto` with the UIA backend to inspect control hierarchies, names, types, and bounding rectangles. Ampersand accelerator keys are normalized and windows are brought to focus prior to interaction.
+- **Vision Routing & Graceful Fallback**: For providers without image vision support, `read_screen_text` and `take_screenshot` provide structural descriptions based on active window and visible windows without crashing or sending raw images to text-only LLMs.
+
+
 

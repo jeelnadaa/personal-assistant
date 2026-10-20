@@ -61,12 +61,22 @@ def _summarize_action(tc: ToolCall, result: ToolResult) -> str:
 
 
 def _encode_image_b64(image_path: str) -> str | None:
-    """Reads and encodes an image file as base64 string."""
+    """Reads, downscales to max 1568px keeping aspect ratio, and encodes image as base64 string."""
     try:
         p = Path(image_path)
         if p.exists():
-            with open(p, "rb") as f:
-                return base64.b64encode(f.read()).decode("utf-8")
+            import io
+            from PIL import Image
+            from jarvis.tools.screen import calculate_downscale_dimensions
+
+            with Image.open(p) as im:
+                orig_w, orig_h = im.size
+                sent_w, sent_h, scale = calculate_downscale_dimensions(orig_w, orig_h, max_side=1568)
+                if scale != 1.0:
+                    im = im.resize((sent_w, sent_h), Image.Resampling.LANCZOS)
+                buf = io.BytesIO()
+                im.save(buf, format="PNG")
+                return base64.b64encode(buf.getvalue()).decode("utf-8")
     except Exception as exc:
         logger.warning("Failed to encode image at %s: %s", image_path, exc)
     return None

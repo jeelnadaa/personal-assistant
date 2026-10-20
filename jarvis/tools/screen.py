@@ -166,9 +166,15 @@ def click_ui_element(window_title_contains: str, element_name: str) -> ToolResul
             return ToolResult(ok=False, output=f"No window found matching '{w_clean}'.")
 
         win = windows[0]
+        try:
+            win.set_focus()
+        except Exception:
+            pass
+
         target_ctrl = None
         for ctrl in win.descendants():
-            c_name = (ctrl.element_info.name or "").strip().lower()
+            raw_name = ctrl.element_info.name or ""
+            c_name = raw_name.replace("&", "").strip().lower()
             if e_clean == c_name or e_clean in c_name:
                 target_ctrl = ctrl
                 break
@@ -197,17 +203,18 @@ def click_ui_element(window_title_contains: str, element_name: str) -> ToolResul
     category="screen",
 )
 def read_screen_text() -> ToolResult:
-    """Transcribes screen contents using vision LLM."""
+    """Transcribes screen contents using vision LLM or structural window inspection."""
     shot_res = take_screenshot()
-    if not shot_res.ok or not shot_res.image_path:
-        return ToolResult(ok=False, output="Failed to capture screen for vision inspection.")
-
     provider = get_vision_provider()
-    if not provider.supports_vision:
+
+    if not shot_res.ok or not shot_res.image_path or not provider.supports_vision:
+        from jarvis.tools.windows_mgmt import get_active_window, list_windows
+        act = get_active_window()
+        wins = list_windows()
         return ToolResult(
             ok=True,
-            output="Screenshot captured, but current configured model does not support image analysis.",
-            image_path=shot_res.image_path,
+            output=f"Current desktop state: Active window is {act.output}. {wins.output}",
+            image_path=None,
         )
 
     try:

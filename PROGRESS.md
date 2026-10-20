@@ -22,7 +22,7 @@
 - [x] **Phase 5: UI**
   - PySide6 overlay (`overlay.py`) with pulsing orb, waveform, confirm buttons
   - Tray icon and menu (`tray.py`)
-- [ ] **Phase 6: Screen vision**
+- [x] **Phase 6: Screen vision**
   - `screen.py` screenshot, scaling/DPI aware coordinate translation, UIA tools, vision click
 - [ ] **Phase 7: Memory + browser automation**
   - SQLite long-term memory (`memory.py`)
