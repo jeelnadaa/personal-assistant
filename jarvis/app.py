@@ -69,16 +69,25 @@ class JarvisApp:
         self.wake_detector.reload_settings()
         logger.info("JarvisApp: Configuration and wake word settings reloaded.")
 
-    def _set_state(self, new_state: AppState, message: str = "") -> None:
+    def _set_state(self, new_state: AppState, message: str = "", query: str = "") -> None:
         """Updates internal state and informs UI callback."""
         with self.state_lock:
             self.state = new_state
             logger.info("Jarvis State -> %s %s", new_state.value, f'({message})' if message else '')
             if self.ui_callback:
                 try:
-                    self.ui_callback(new_state.value, message)
+                    import inspect
+                    sig = inspect.signature(self.ui_callback)
+                    if len(sig.parameters) >= 3:
+                        self.ui_callback(new_state.value, message, query)
+                    else:
+                        self.ui_callback(new_state.value, message)
                 except Exception as e:
                     logger.warning("UI callback error: %s", e)
+
+    def wake(self) -> None:
+        """Triggers wake listening cycle (e.g. from UI click or shortcut)."""
+        self._on_wake_detected()
 
     def _on_kill_switch(self) -> None:
         """Handles emergency kill switch (Ctrl+Alt+J)."""
@@ -209,7 +218,7 @@ class JarvisApp:
         print(f"\n[Turnaround Latency]: {speech_to_reply_latency:.2f}s | Jarvis: {reply}\n")
 
         # Speak response (ensure wakeword remains active for barge-in)
-        self._set_state(AppState.SPEAKING, reply)
+        self._set_state(AppState.SPEAKING, reply, query=user_text)
         mic_stream.resume_wakeword()
         try:
             speak(reply, block=True)
@@ -226,7 +235,9 @@ class JarvisApp:
             logger.info("Reply ended with question mark. Initiating automatic follow-up listening.")
             self._process_voice_turn(turn_id, is_followup=True)
         else:
-            self._set_state(AppState.IDLE)
+            with self.state_lock:
+                self.state = AppState.IDLE
+            logger.info("Jarvis turn complete. Answer card displayed; ready for wake word or Esc.")
 
     def start(self) -> None:
         """Starts microphone stream, kill switch, wake word detector, and state machine."""

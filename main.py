@@ -203,6 +203,7 @@ def run_voice_gui_mode(show_console: bool = False) -> None:
     validate_env()
     overlay = get_overlay()
     app = JarvisApp(ui_callback=overlay.update_state)
+    overlay.set_wake_handler(app.wake)
 
     def on_quit() -> None:
         app.stop()

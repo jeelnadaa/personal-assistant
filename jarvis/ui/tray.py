@@ -195,6 +195,25 @@ class JarvisTray:
         if self.on_quit:
             self.on_quit()
 
+    def _is_pill_visible(self) -> bool:
+        """Checks if the floating idle pill is currently set to be visible."""
+        try:
+            from jarvis.ui.overlay import get_overlay
+            return get_overlay().is_idle_pill_visible()
+        except Exception:
+            return True
+
+    def _on_toggle_pill_clicked(self, icon: pystray.Icon, item: Any) -> None:
+        """Toggles visibility of the idle floating pill."""
+        try:
+            from jarvis.ui.overlay import get_overlay
+            overlay = get_overlay()
+            new_state = overlay.toggle_idle_pill_visible()
+            status = "visible" if new_state else "hidden"
+            logger.info("Tray menu: Floating pill visibility toggled to %s.", status)
+        except Exception as e:
+            logger.warning("Could not toggle pill visibility: %s", e)
+
     def _build_menu(self) -> pystray.Menu:
         """Constructs the system tray context menu."""
         return pystray.Menu(
@@ -202,6 +221,10 @@ class JarvisTray:
             pystray.MenuItem(
                 lambda item: "Resume listening" if self.is_paused else "Pause listening",
                 self._on_toggle_pause_clicked,
+            ),
+            pystray.MenuItem(
+                lambda item: "Hide Floating Pill" if self._is_pill_visible() else "Show Floating Pill",
+                self._on_toggle_pill_clicked,
             ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Configure (config.yaml)", self._on_edit_config_clicked),

@@ -92,6 +92,7 @@ hiddenimports = [
     "jarvis.ui",
     "jarvis.ui.overlay",
     "jarvis.ui.tray",
+    "jarvis.ui.widgets",
     # System and third-party dependencies
     "ctranslate2",
     "faster_whisper",
@@ -145,7 +146,6 @@ excludes = [
     "notebook",
     "jupyter",
     "pytest",
-    "unittest",
 ]
 
 a = Analysis(

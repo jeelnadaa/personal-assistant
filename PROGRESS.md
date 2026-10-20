@@ -48,4 +48,16 @@
   - Wake greeting speech interruption / barge-in (`mic_stream.record_until_silence(on_speech_start=stop_speech)`)
   - Wake word task cancellation during thinking, execution, or speech playback
   - Clean structured `.env` configuration schema grouped by task, provider, and credentials
-  - 91 tests passing across test suite
+- [x] **Phase 10: Modern Figma UI Redesign (Idle Pill, Listening Waveform, Transcribing Spinner & Answer Card)**
+  - Floating Idle State pill widget (`IdlePillWidget`: 52x28px, border-radius 14px, #2B2B2B, #454545 border, centered 16x16 vector mic icon in #BDBDBD) positioned above Windows 11 taskbar.
+  - Floating idle pill can be hidden/shown via System Tray menu ("Hide/Show Floating Pill") or right-click context menu.
+  - Clicking floating pill triggers wake / starts listening; draggable anywhere on screen; double-click resets position.
+  - Active Popup Card (`ActivePopupCard`: 440px dark card, #2B2B2B, border #454545, border-radius 8px, shadow):
+    - Listening state: 20x20 vector mic icon (#FFFFFF), text (15px #FFFFFF), 5 cyan animated waveform bars (#60CDFF).
+    - Transcribing state: 20x20 rotating spinner circle (#4A4A4A track, #60CDFF rotating arc), transcribed question text (15px #FFFFFF).
+    - Answer state: query text (13px #A8A8A8) on top, reply text (16px #FFFFFF, line-height 1.45) below, footer with `[Esc] Close` and `[Ctrl C] Copy` keycap tags.
+  - Keyboard interactions: `Esc` closes answer card and restores idle floating pill; `Ctrl+C` copies assistant response to system clipboard with visual "Copied!" feedback tag.
+  - Wake word barge-in during Transcribing state: saying "Hey Jarvis" while transcribing or thinking cancels ongoing task and immediately switches state to Listening.
+  - Verified across `python main.py` and standalone `dist/jarvis.exe`.
+  - All 96 tests passing across full test suite.
+

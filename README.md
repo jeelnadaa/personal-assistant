@@ -237,6 +237,29 @@ Powered by Playwright Chromium with persistent user profiles stored in `data/bro
 
 ---
 
+## Modern Voice UI & Floating Widgets
+
+Jarvis features a sleek dark glassmorphic interface styled precisely to modern Windows 11 aesthetics:
+
+1. **Floating Idle Pill (`IdlePillWidget`)**:
+   - Compact 52x28 capsule widget (`#2B2B2B`, 14px border radius, `#454545` border, `#BDBDBD` mic icon) floating right above the Windows taskbar.
+   - **Click to Wake**: Click the pill directly to start listening without saying the wake phrase.
+   - **Draggable**: Drag the pill anywhere on your screen. Double-click to reset back to bottom-center.
+   - **Hide / Re-appear**: Right-click the pill and choose **"Hide Floating Pill"**, or toggle visibility anytime from the System Tray menu (**"Hide/Show Floating Pill"**).
+
+2. **Active State Popup (`ActivePopupCard`)**:
+   - 440px wide dark card (`#2B2B2B`, 8px border radius, `#454545` border, soft drop shadow).
+   - **Listening**: 20x20 white mic icon, user speech prompt, and 5 animated cyan waveform bars (`#60CDFF`).
+   - **Transcribing**: Rotating 20x20 cyan spinner arc on a dark track and transcribed query text.
+   - **Answer**: Original question at top (`13px #A8A8A8`), response text (`16px #FFFFFF`), and shortcut footer:
+     - **`Esc`**: Closes the answer card and returns to the floating Idle state pill.
+     - **`Ctrl+C`**: Copies the assistant response text directly to the Windows clipboard with interactive visual "Copied!" feedback.
+
+3. **Wake Word Barge-In During Transcribing & Thinking**:
+   - Saying the wake phrase (e.g. *"Hey Jarvis"*) while Jarvis is transcribing or thinking immediately interrupts the active cycle and transitions straight back into Listening mode.
+
+---
+
 ## Running Tests
 Run the entire test suite across all 8 phases using `pytest`:
 ```powershell

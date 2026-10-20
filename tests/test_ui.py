@@ -8,7 +8,8 @@ import time
 from unittest.mock import MagicMock, patch
 import pytest
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6.QtCore import Qt
 
 from jarvis.safety import confirm
 from jarvis.ui.overlay import AnimatedIndicator, JarvisOverlay
@@ -165,3 +166,109 @@ def test_confirm_voice_worker(monkeypatch):
 
     assert confirm_event.is_set()
     assert result_box[0] is True
+
+
+def test_idle_pill_widget(qapp):
+    """Verifies floating idle pill dimension (52x28), wake callback, and hide/show visibility."""
+    woken = []
+    hidden = []
+    from jarvis.ui.widgets import IdlePillWidget
+    pill = IdlePillWidget(on_wake=lambda: woken.append(True), on_hide_pill=lambda: hidden.append(True))
+    assert pill.width() == 52
+    assert pill.height() == 28
+
+    # Simulate click without drag
+    pill._has_dragged = False
+    pill.mouseReleaseEvent(QtGui.QMouseEvent(
+        QtCore.QEvent.Type.MouseButtonRelease,
+        QtCore.QPointF(26, 14),
+        QtCore.QPointF(26, 14),
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    ))
+    assert woken == [True]
+
+
+def test_new_popup_states_and_design(qapp):
+    """Verifies Listening, Transcribing, and Answer card states matching exact Figma specs."""
+    overlay = JarvisOverlay()
+
+    # 1. Listening State
+    overlay._on_set_state("LISTENING", "What's the weather like in Beng")
+    assert not overlay.popup_card.listening_widget.isHidden()
+    assert overlay.popup_card.transcribing_widget.isHidden()
+    assert overlay.popup_card.answer_widget.isHidden()
+    assert overlay.popup_card.listen_label.text() == "What's the weather like in Beng"
+    assert overlay.idle_pill.isHidden()
+
+    # 2. Transcribing State
+    overlay._on_set_state("TRANSCRIBING", "What's the weather like in Bengaluru today?")
+    assert overlay.popup_card.listening_widget.isHidden()
+    assert not overlay.popup_card.transcribing_widget.isHidden()
+    assert overlay.popup_card.answer_widget.isHidden()
+    assert overlay.popup_card.transcribe_label.text() == "What's the weather like in Bengaluru today?"
+
+    # 3. Answer State
+    overlay._on_set_state(
+        "SPEAKING",
+        "It's sunny and around 28°C in Bengaluru right now.",
+        query="What's the weather like in Bengaluru today?",
+    )
+    assert overlay.popup_card.listening_widget.isHidden()
+    assert overlay.popup_card.transcribing_widget.isHidden()
+    assert not overlay.popup_card.answer_widget.isHidden()
+    assert overlay.popup_card.ans_query_label.text() == "What's the weather like in Bengaluru today?"
+    assert "28°C" in overlay.popup_card.ans_text_label.text()
+    assert not overlay.popup_card.close_hint.isHidden()
+    assert not overlay.popup_card.copy_hint.isHidden()
+
+
+def test_answer_esc_key_closes_to_idle(qapp):
+    """Verifies Esc shortcut closes Answer card and restores the Idle floating pill."""
+    overlay = JarvisOverlay()
+    overlay.set_idle_pill_visible(True)
+
+    overlay._on_set_state("SPEAKING", "Test answer content", query="Test question?")
+    assert not overlay.popup_card.isHidden()
+    assert overlay.idle_pill.isHidden()
+
+    # Trigger close to idle (Esc action)
+    overlay.popup_card.close_to_idle()
+    assert overlay.popup_card.isHidden()
+    assert not overlay.idle_pill.isHidden()
+    assert overlay.current_state == "IDLE"
+
+
+def test_answer_ctrl_c_copies_to_clipboard(qapp):
+    """Verifies Ctrl+C copies assistant response to the system clipboard."""
+    import pyperclip
+    overlay = JarvisOverlay()
+    answer_text = "Here is the copied text for testing clipboard functionality."
+    overlay._on_set_state("SPEAKING", answer_text, query="Copy test")
+
+    overlay.popup_card.copy_answer()
+    assert (
+        QtWidgets.QApplication.clipboard().text() == answer_text
+        or pyperclip.paste() == answer_text
+    )
+
+
+def test_wake_word_barge_in_during_transcribing():
+    """Verifies saying wake word during Transcribing cancels previous task and switches to LISTENING."""
+    from jarvis.app import AppState, JarvisApp
+
+    state_history = []
+    app = JarvisApp(ui_callback=lambda st, msg, *args: state_history.append(st), enable_tray=False)
+    app.state = AppState.PROCESSING  # Transcribing / thinking state
+    initial_turn = app.turn_counter
+
+    # Mock audio pipeline so worker thread doesn't record hardware audio
+    with patch("jarvis.app.mic_stream.record_until_silence", return_value=None), \
+         patch("jarvis.app.warmup_wake_greetings"):
+        app._on_wake_detected()
+
+    assert app.turn_counter == initial_turn + 1
+    # State switches to LISTENING
+    assert app.state == AppState.LISTENING
+
