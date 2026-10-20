@@ -76,9 +76,10 @@
   - **Greeting TTS Consistency**: Spoken wake greetings now route directly through `tts.speak(greeting, block=True)` using the active TTS engine (`piper`, `edge`, `pyttsx3`), active voice, and speed parameters without playing stale cached MP3 files.
   - **Settings Guide Card Styling**: Fixed inner outline line on guide labels by scoping container borders to `QFrame#settingsCard` and explicitly defining `border: none; background: transparent;` on child labels.
   - **Fallback Model Configuration**: Added Fallback Model Identifier field (`txt_fallback_model`) under Fallback Provider in Settings -> Brain, dynamically populating provider defaults (`gemini-3.5-flash`, `claude-sonnet-5-5`, `qwen/qwen3.8-27b`) and synchronizing to `FALLBACK_MODEL` for automated failover.
-  - **ActivePopupCard Fixed Geometry**: Standardized popup card to fixed width 460px (`self.setFixedWidth(460)`), eliminating Windows platform plugin geometry conflict warnings.
+  - **Layered Window Dirty Rect Fix**: Eliminated Win32 `UpdateLayeredWindowIndirect failed for ptDst=(...), dirty=(-24, -12) (The parameter is incorrect)` by removing `QGraphicsDropShadowEffect` from `ActivePopupCard` layered window and zeroing root layout margins, preventing negative dirty rectangles that fail Windows API parameter validation.
+  - **High-DPI Window Positioning**: Replaced `self.setGeometry(x, y, w, h)` with `self.move(x, y)` in `ActivePopupCard.reposition_above_taskbar()`, letting Qt's internal layout manager govern height on high-DPI (150% scaling) screens without triggering Windows min-track geometry warnings (`QWindowsWindow::setGeometry: Unable to set geometry 690x182... Resulting geometry: 690x215`).
   - **Native Windows GUI Executable**: Set `console=False` in `jarvis.spec` and redirected standard streams; `jarvis.exe` now launches cleanly without opening a black command prompt window.
   - **Zero `.env` Dependency in Portable Distribution**: Removed frozen auto-creation of `.env` files and purged `.env` from `dist/Jarvis-Portable-Windows/` and `Jarvis-Portable-Windows.zip`. All configuration is managed seamlessly in-app via `%LOCALAPPDATA%\Jarvis\settings.json` and the DPAPI vault.
-  - **Full Test Suite Passing**: 108 automated unit tests passing (`tests/test_ui.py` additions included).
+  - **Full Test Suite Passing**: All 108 automated unit tests passing cleanly.
 
 

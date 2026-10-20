@@ -145,5 +145,8 @@
   - Set `console=False` in `jarvis.spec` so `jarvis.exe` compiles using the Windows GUI subsystem (`runw.exe`), launching cleanly with no black command prompt window.
   - Safely redirected `sys.stdout` and `sys.stderr` to `os.devnull` when running without a console.
   - Removed frozen auto-creation of `.env` files in `jarvis/config.py` and purged `.env` from the portable release folder and ZIP archive. All configuration and keys reside strictly within user-writable `%LOCALAPPDATA%\Jarvis\settings.json` and the Windows DPAPI vault.
+- **Layered Window Dirty Rect & High-DPI Geometry Resolution (`jarvis/ui/overlay.py`)**:
+  - Eliminated Win32 `UpdateLayeredWindowIndirect failed for ptDst=(...), size=(...), dirty=(-24, -12) (The parameter is incorrect.)`: Qt layered windows (`WA_TranslucentBackground` + `FramelessWindowHint`) pass their dirty paint region to the Windows `UpdateLayeredWindowIndirect` API. Attaching `QGraphicsDropShadowEffect` with blur radius 24 produced negative dirty rectangles (`dirty.left < 0`), which the Win32 API rejects with `ERROR_INVALID_PARAMETER` (87). Removed the effect and zeroed root layout margins so dirty bounds remain non-negative and contained within the window surface.
+  - Resolved `QWindowsWindow::setGeometry: Unable to set geometry 690x182... Resulting geometry: 690x215...`: High-DPI displays (e.g. 150% scaling, 460px -> 690px) enforce minimum track heights via `WM_GETMINMAXINFO`. Calling `self.setGeometry(x, y, w, h)` with an outdated height forced a geometry mismatch against the track constraint. Replaced with `self.move(x, y)`, letting the Qt layout govern height organically while anchoring the card above the Windows taskbar.
 
 

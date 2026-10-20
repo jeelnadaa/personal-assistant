@@ -104,7 +104,7 @@ class ActivePopupCard(QWidget):
     def _init_ui(self) -> None:
         """Builds container layout with states: Listening, Transcribing, Answer, Confirm."""
         self.root_layout = QVBoxLayout(self)
-        self.root_layout.setContentsMargins(8, 8, 8, 8)
+        self.root_layout.setContentsMargins(0, 0, 0, 0)
 
         self.container = QWidget(self)
         self.container.setObjectName("popupContainer")
@@ -120,11 +120,6 @@ class ActivePopupCard(QWidget):
             }
             """
         )
-        shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(24)
-        shadow.setColor(QColor(0, 0, 0, 160))
-        shadow.setOffset(0, 8)
-        self.container.setGraphicsEffect(shadow)
         self.root_layout.addWidget(self.container)
 
         # Delegate container mouse events for effortless dragging
@@ -364,18 +359,18 @@ class ActivePopupCard(QWidget):
         screen = QApplication.primaryScreen()
         if screen:
             geo = screen.availableGeometry()
-            w = 460
-            h = max(self.sizeHint().height(), self.height(), 100)
+            w = self.width()
+            h = self.height()
             if not getattr(self, "_custom_positioned", False):
                 x = geo.x() + (geo.width() - w) // 2
                 y = geo.y() + geo.height() - h - 16
-                self.setGeometry(x, y, w, h)
+                self.move(x, y)
             else:
                 curr_x = self.x()
                 curr_y = self.y()
                 clamped_x = max(geo.x(), min(curr_x, geo.x() + geo.width() - w))
                 clamped_y = max(geo.y(), min(curr_y, geo.y() + geo.height() - h))
-                self.setGeometry(clamped_x, clamped_y, w, h)
+                self.move(clamped_x, clamped_y)
 
     def close_to_idle(self) -> None:
         """Dismisses the popup card and returns to idle floating pill."""
