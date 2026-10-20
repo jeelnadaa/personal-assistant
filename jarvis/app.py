@@ -52,12 +52,20 @@ class JarvisApp:
                 self.tray = JarvisTray(
                     on_quit=self.stop,
                     get_status_fn=lambda: self.state.value,
+                    on_reload=self.reload_configuration,
                 )
             except Exception as e:
                 logger.warning("Could not initialize system tray: %s", e)
 
         # Link kill switch to speech and task cancellation
         set_kill_callback(self._on_kill_switch)
+
+    def reload_configuration(self) -> None:
+        """Reloads runtime configuration from disk without restarting."""
+        from jarvis.config import reload_config
+        reload_config()
+        self.wake_detector.reload_settings()
+        logger.info("JarvisApp: Configuration and wake word settings reloaded.")
 
     def _set_state(self, new_state: AppState, message: str = "") -> None:
         """Updates internal state and informs UI callback."""

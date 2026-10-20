@@ -393,5 +393,6 @@ def get_overlay() -> JarvisOverlay:
         app = QApplication.instance()
         if app is None:
             app = QApplication(sys.argv)
+        app.setQuitOnLastWindowClosed(False)
         _OVERLAY_INSTANCE = JarvisOverlay()
     return _OVERLAY_INSTANCE

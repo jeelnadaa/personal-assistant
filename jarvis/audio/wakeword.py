@@ -61,6 +61,31 @@ class WakeWordDetector:
 
         self.model = None
 
+    def reload_settings(self) -> None:
+        """Reloads wake word settings from updated environment and configuration."""
+        ww_cfg = config.get("wakeword", {})
+        raw_phrase = os.getenv("WAKEWORD_PHRASE", ww_cfg.get("phrase", "hey_jarvis"))
+        self.raw_phrase = raw_phrase.strip()
+        self.normalized_phrase = normalize_phrase(self.raw_phrase)
+        self.custom_model_path = os.getenv("WAKEWORD_MODEL_PATH", ww_cfg.get("custom_model_path", ""))
+        self.threshold = float(os.getenv("WAKEWORD_THRESHOLD", ww_cfg.get("threshold", 0.5)))
+        self.builtin_key = OPENWAKEWORD_BUILTIN.get(self.normalized_phrase)
+
+        if self.custom_model_path and Path(self.custom_model_path).exists():
+            self.mode = "custom_onnx"
+        elif self.builtin_key:
+            self.mode = "openwakeword"
+        else:
+            self.mode = "whisper_verifier"
+
+        self.model = None  # Recreated on next loop
+        logger.info(
+            "WakeWordDetector reloaded: phrase='%s', mode=%s, threshold=%.2f",
+            self.raw_phrase,
+            self.mode,
+            self.threshold,
+        )
+
     def _ensure_model(self) -> None:
         """Initializes openWakeWord model for built-in or custom ONNX models."""
         if self.mode == "whisper_verifier":

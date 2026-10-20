@@ -74,3 +74,11 @@
   2. Stage 2: Segment is verified via local Whisper transcription against normalized target phrases.
 - **Phonetic Spoken URL Normalization**: Added `normalize_spoken_url()` in `jarvis/tools/web.py` to convert spoken URL patterns (e.g. "github dot com", "slash pull request") into valid HTTP URLs while preserving explicit schemes like `data:`, `file://`, and `about:`.
 - **Expanded Windows System Automation**: Added `media_control` using Windows virtual key codes (`VK_MEDIA_PLAY_PAUSE`, `VK_MEDIA_NEXT_TRACK`, `VK_MEDIA_PREV_TRACK`, `VK_MEDIA_STOP`), `get_network_info` for interface status and IP address diagnostics, and `cancel_shutdown` (`shutdown /a`).
+
+## Standalone Executable & System Tray Decisions
+- **PyInstaller Bundling (`jarvis.spec` & `scripts/build_exe.py`)**: Packaged the entire Python runtime, native dependencies (`ctranslate2`, PortAudio, `webrtcvad`), ONNX models (`openwakeword`), phoneme databases (`piper`), and `PySide6` plugins into a standalone Windows binary (`dist/jarvis.exe`).
+- **Dynamic Config Without Rebuilding**: Modified `jarvis/config.py` to detect `sys.frozen` and set `BASE_DIR = Path(sys.executable).resolve().parent`. Settings in `dist/config.yaml` and `.env` are read at runtime without recompiling. Added `reload_config()` for live dynamic updates.
+- **Custom WebRTCVAD Hook**: Created `hooks/hook-webrtcvad.py` to gracefully resolve metadata under `webrtcvad-wheels`, preventing PyInstaller packaging failures.
+- **System Tray Persistence**: Called `qt_app.setQuitOnLastWindowClosed(False)` on `QApplication` ensuring Qt's event loop and the `pystray` system tray remain active indefinitely when the floating PySide6 overlay hides in IDLE state.
+- **Tray In-App Management**: Expanded `jarvis/ui/tray.py` with shortcuts to edit `config.yaml`, edit `.env`, trigger live config reload, toggle the attached console window, and open data/logs directories in Windows Explorer.
+

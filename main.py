@@ -177,7 +177,7 @@ from jarvis.platform.mutex import SingleInstanceMutex
 from jarvis.setup_check import run_all_checks
 
 
-def run_voice_gui_mode() -> None:
+def run_voice_gui_mode(show_console: bool = False) -> None:
     """Launches full voice mode with PySide6 overlay and system tray."""
     from PySide6 import QtCore, QtWidgets
     from jarvis.app import JarvisApp
@@ -187,6 +187,9 @@ def run_voice_gui_mode() -> None:
     qt_app = QtWidgets.QApplication.instance()
     if qt_app is None:
         qt_app = QtWidgets.QApplication(sys.argv)
+
+    # CRITICAL: Keep Qt application event loop alive in the system tray when overlay is hidden!
+    qt_app.setQuitOnLastWindowClosed(False)
 
     overlay = get_overlay()
     app = JarvisApp(ui_callback=overlay.update_state)
@@ -203,6 +206,15 @@ def run_voice_gui_mode() -> None:
     sig_timer.timeout.connect(lambda: None)
     sig_timer.start(250)
 
+    # Hide console window in background voice mode unless explicitly requested
+    if not show_console:
+        try:
+            hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+            if hwnd:
+                ctypes.windll.user32.ShowWindow(hwnd, 0)  # SW_HIDE
+        except Exception:
+            pass
+
     app.start()
     try:
         qt_app.exec()
@@ -212,8 +224,27 @@ def run_voice_gui_mode() -> None:
         app.stop()
 
 
+def print_config_summary() -> None:
+    """Prints a non-secret configuration overview."""
+    from jarvis.config import get_config_summary
+    summary = get_config_summary()
+    print("=" * 60)
+    print(" Jarvis Assistant - Configuration Overview")
+    print("=" * 60)
+    for k, v in summary.items():
+        print(f" {k:<20}: {v}")
+    print("=" * 60)
+
+
 def main() -> None:
     """CLI entry point parsing flags and executing appropriate mode."""
+    # Ensure current working directory is aligned with BASE_DIR for data and logs
+    from jarvis.config import BASE_DIR
+    try:
+        os.chdir(BASE_DIR)
+    except Exception as e:
+        logger.warning("Could not set working directory to %s: %s", BASE_DIR, e)
+
     parser = argparse.ArgumentParser(description="Jarvis Voice & Automation Assistant")
     parser.add_argument(
         "--text",
@@ -233,6 +264,18 @@ def main() -> None:
         help="Run pre-flight diagnostic hardware, key, and model verification.",
     )
     parser.add_argument(
+        "--config",
+        "--show-config",
+        action="store_true",
+        dest="show_config",
+        help="Display current configuration file locations and active settings.",
+    )
+    parser.add_argument(
+        "--show-console",
+        action="store_true",
+        help="Do not hide console window when starting voice mode.",
+    )
+    parser.add_argument(
         "--no-mutex",
         action="store_true",
         help="Bypass single-instance named mutex lock.",
@@ -243,6 +286,10 @@ def main() -> None:
         help="Disable automatic crash recovery supervisor loop.",
     )
     args = parser.parse_args()
+
+    if args.show_config:
+        print_config_summary()
+        return
 
     if args.check_setup:
         print("Running Jarvis pre-flight setup check...\n")
@@ -283,11 +330,12 @@ def main() -> None:
             return
 
         # Voice mode with GUI overlay and system tray
+        gui_target = lambda: run_voice_gui_mode(show_console=args.show_console)
         if args.no_crash_recovery:
-            run_voice_gui_mode()
+            gui_target()
         else:
             supervisor = CrashSupervisor()
-            supervisor.run_supervised(run_voice_gui_mode)
+            supervisor.run_supervised(gui_target)
 
     finally:
         if mutex:

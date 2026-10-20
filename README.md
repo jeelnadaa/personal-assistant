@@ -102,9 +102,51 @@ To download or change Piper voices:
 2. The default model is `en_GB-alan-medium.onnx` and `en_GB-alan-medium.onnx.json` from [rhasspy/piper](https://github.com/rhasspy/piper).
 3. Update `audio.piper_model_path` in `config.yaml` to switch voices.
 
-## Running Jarvis (Voice Mode)
-Launch the voice assistant:
+---
+
+## Standalone Executable & Rebuilding
+
+Jarvis can be compiled into a standalone Windows executable (`dist/jarvis.exe`) that bundles all dependencies (PySide6, CTranslate2, faster-whisper, openWakeWord, Piper TTS, pystray, Playwright) into a single portable binary.
+
+### Command to Rebuild the App
+To compile or re-compile the standalone executable:
 ```powershell
+python scripts/build_exe.py
+```
+To perform a clean rebuild from scratch:
+```powershell
+python scripts/build_exe.py --clean
+```
+
+### In-App Configuration (No Rebuilding Required)
+You **never** need to recompile the executable to change settings. Jarvis dynamically reads its configuration from the files adjacent to `jarvis.exe`:
+- **`dist/config.yaml`**: Edit wake phrase, STT/TTS engine, volume, speech rate, search engine, and UI preferences.
+- **`dist/.env`**: Edit API keys, active LLM provider, and model names.
+- **`dist/data/`**: Holds your persistent SQLite memory (`memory.db`), application index cache (`apps_cache.json`), and offline Piper voice models (`piper_voices/`).
+
+### System Tray Resident Operation
+When launched, `jarvis.exe` minimizes to the Windows System Tray (Taskbar Notification Area):
+- The animated PySide6 overlay appears only when listening, processing, speaking, or asking for confirmation.
+- The assistant stays alive in the system tray even when the overlay window is hidden.
+- Right-click the Jarvis tray icon for instant in-app management:
+  - **Status**: View active provider, model, wake phrase, and audio status.
+  - **Configure (config.yaml)**: Opens `config.yaml` in your default text editor.
+  - **Configure Keys (.env)**: Opens `.env` in Notepad for easy API key edits.
+  - **Reload Configuration**: Live-reloads settings and wake words into memory without restarting!
+  - **Toggle Console Window**: Shows or hides the attached command prompt window for viewing live logs.
+  - **Open Data / Logs Folder**: One-click access to stored memories, voice models, and audit logs.
+  - **Stop Current Task (Ctrl+Alt+J)**: Instantly halts active tools or speech.
+  - **Quit Jarvis**: Cleanly tears down the assistant and releases system resources.
+
+---
+
+## Running Jarvis (Voice Mode)
+Launch the voice assistant from python or the standalone executable:
+```powershell
+# Using the standalone binary:
+dist\jarvis.exe
+
+# Or using python:
 python main.py
 ```
 - Say **"Hey Jarvis"** (or your custom wake phrase from `config.yaml`) to wake the assistant.

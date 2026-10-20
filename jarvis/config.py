@@ -13,8 +13,26 @@ from dotenv import load_dotenv
 
 from jarvis.logger import logger
 
+def get_base_dir() -> Path:
+    """Returns the base directory for user configuration, data, and logs.
+
+    When running inside a frozen PyInstaller binary, this points to the directory
+    containing the executable so user config persists and can be edited.
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent.parent
+
+
+def get_bundled_dir() -> Path:
+    """Returns the directory of bundled resources inside PyInstaller or source tree."""
+    if hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS)
+    return Path(__file__).resolve().parent.parent
+
+
 # Base directory for configuration and data
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = get_base_dir()
 
 
 def load_config(config_path: Path | None = None) -> dict[str, Any]:
@@ -26,38 +44,124 @@ def load_config(config_path: Path | None = None) -> dict[str, Any]:
     Returns:
         A dictionary containing merged configuration settings.
     """
+    global BASE_DIR
+    BASE_DIR = get_base_dir()
+
     env_path = BASE_DIR / ".env"
     if env_path.exists():
-        load_dotenv(dotenv_path=env_path)
+        load_dotenv(dotenv_path=env_path, override=True)
     else:
-        # Load from system environment if .env doesn't exist
-        load_dotenv()
+        # If frozen and .env is missing, attempt to copy .env.example
+        if getattr(sys, "frozen", False):
+            bundled_env = get_bundled_dir() / ".env.example"
+            if bundled_env.exists() and not env_path.exists():
+                try:
+                    import shutil
+                    shutil.copy2(bundled_env, env_path)
+                    logger.info("Copied initial .env template to %s", env_path)
+                except Exception as e:
+                    logger.warning("Could not create initial .env: %s", e)
+        load_dotenv(override=True)
 
     cfg_file = config_path or (BASE_DIR / "config.yaml")
-    config: dict[str, Any] = {}
+    config_dict: dict[str, Any] = {}
     if cfg_file.exists():
         with open(cfg_file, "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f) or {}
+            config_dict = yaml.safe_load(f) or {}
     else:
-        logger.warning("config.yaml not found at %s, using defaults", cfg_file)
+        # Check bundled fallback
+        bundled_cfg = get_bundled_dir() / "config.yaml"
+        if bundled_cfg.exists() and bundled_cfg != cfg_file:
+            try:
+                with open(bundled_cfg, "r", encoding="utf-8") as f:
+                    config_dict = yaml.safe_load(f) or {}
+                # Copy template next to exe for easy user editing without rebuild
+                try:
+                    import shutil
+                    shutil.copy2(bundled_cfg, cfg_file)
+                    logger.info("Extracted default config.yaml to %s for user editing", cfg_file)
+                except Exception:
+                    pass
+            except Exception as e:
+                logger.warning("Error reading bundled config.yaml: %s", e)
+        else:
+            logger.warning("config.yaml not found at %s, using defaults", cfg_file)
 
-    # Allow .env overrides for specific config values
+    # Allow .env overrides for runtime configuration
     if "LLM_PROVIDER" in os.environ:
-        config.setdefault("llm", {})["provider"] = os.getenv("LLM_PROVIDER")
+        config_dict.setdefault("llm", {})["provider"] = os.getenv("LLM_PROVIDER")
 
     if "STT_PROVIDER" in os.environ:
-        config.setdefault("stt", {})["provider"] = os.getenv("STT_PROVIDER")
+        config_dict.setdefault("stt", {})["provider"] = os.getenv("STT_PROVIDER")
+
+    if "STT_MODEL" in os.environ:
+        config_dict.setdefault("stt", {})["local_model"] = os.getenv("STT_MODEL")
+
+    if "STT_DEVICE" in os.environ:
+        config_dict.setdefault("stt", {})["device"] = os.getenv("STT_DEVICE")
 
     if "TTS_PROVIDER" in os.environ:
-        config.setdefault("tts", {})["provider"] = os.getenv("TTS_PROVIDER")
+        config_dict.setdefault("tts", {})["engine"] = os.getenv("TTS_PROVIDER")
+
+    if "PIPER_VOICE" in os.environ:
+        voice_name = os.getenv("PIPER_VOICE", "")
+        if voice_name:
+            config_dict.setdefault("tts", {})["piper_model_path"] = f"data/piper_voices/{voice_name}.onnx"
+
+    if "TTS_SPEED" in os.environ:
+        try:
+            config_dict.setdefault("tts", {})["speech_rate"] = float(os.getenv("TTS_SPEED", 1.0))
+        except ValueError:
+            pass
+
+    if "WAKEWORD_PHRASE" in os.environ:
+        config_dict.setdefault("wakeword", {})["phrase"] = os.getenv("WAKEWORD_PHRASE")
+
+    if "SEARCH_ENGINE" in os.environ:
+        config_dict.setdefault("browser", {})["search_engine"] = os.getenv("SEARCH_ENGINE")
 
     if "USER_NAME" in os.environ:
-        config.setdefault("persona", {})["user_name"] = os.getenv("USER_NAME")
+        config_dict.setdefault("persona", {})["user_name"] = os.getenv("USER_NAME")
 
     if "HONORIFIC" in os.environ:
-        config.setdefault("persona", {})["honorific"] = os.getenv("HONORIFIC")
+        config_dict.setdefault("persona", {})["honorific"] = os.getenv("HONORIFIC")
 
+    return config_dict
+
+
+def reload_config() -> dict[str, Any]:
+    """Reloads environment variables and config.yaml into the global config dictionary."""
+    new_cfg = load_config()
+    config.clear()
+    config.update(new_cfg)
+    logger.info("Configuration reloaded successfully.")
     return config
+
+
+def get_config_summary() -> dict[str, Any]:
+    """Returns a sanitized summary of active configuration without disclosing secrets."""
+    provider = os.getenv("LLM_PROVIDER", config.get("llm", {}).get("provider", "groq"))
+    model = (
+        os.getenv(f"{provider.upper()}_MODEL")
+        or config.get("llm", {}).get("model", "")
+    )
+    return {
+        "base_dir": str(BASE_DIR),
+        "config_file": str(BASE_DIR / "config.yaml"),
+        "config_file_exists": (BASE_DIR / "config.yaml").exists(),
+        "env_file": str(BASE_DIR / ".env"),
+        "env_file_exists": (BASE_DIR / ".env").exists(),
+        "llm_provider": provider,
+        "llm_model": model,
+        "stt_provider": config.get("stt", {}).get("provider", "local"),
+        "stt_model": config.get("stt", {}).get("local_model", "medium.en"),
+        "stt_device": config.get("stt", {}).get("device", "auto"),
+        "tts_engine": config.get("tts", {}).get("engine", "piper"),
+        "tts_speed": config.get("tts", {}).get("speech_rate", 1.0),
+        "wakeword_phrase": config.get("wakeword", {}).get("phrase", "hey_jarvis"),
+        "search_engine": config.get("browser", {}).get("search_engine", "google"),
+    }
+
 
 
 def validate_env() -> None:

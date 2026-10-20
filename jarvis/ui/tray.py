@@ -42,19 +42,31 @@ class JarvisTray:
         self,
         on_quit: Callable[[], None] | None = None,
         get_status_fn: Callable[[], str] | None = None,
+        on_reload: Callable[[], None] | None = None,
     ) -> None:
         self.on_quit = on_quit
         self.get_status_fn = get_status_fn
+        self.on_reload = on_reload
         self.is_paused = False
+        self.console_visible = False
         self.icon: pystray.Icon | None = None
         self._thread: threading.Thread | None = None
 
     def _on_status_clicked(self, icon: pystray.Icon, item: Any) -> None:
         """Displays status notification."""
+        from jarvis.config import get_config_summary
+        cfg_summary = get_config_summary()
         status = self.get_status_fn() if self.get_status_fn else "Running"
+        summary_msg = (
+            f"Status: {status}\n"
+            f"Provider: {cfg_summary['llm_provider']} ({cfg_summary['llm_model']})\n"
+            f"Wake phrase: '{cfg_summary['wakeword_phrase']}'\n"
+            f"STT: {cfg_summary['stt_provider']} ({cfg_summary['stt_model']} on {cfg_summary['stt_device']})\n"
+            f"TTS: {cfg_summary['tts_engine']}"
+        )
         logger.info("Tray menu: Status queried -> %s", status)
         try:
-            icon.notify(f"Current Status: {status}", title="Jarvis Assistant")
+            icon.notify(summary_msg, title="Jarvis Assistant Status")
         except Exception as e:
             logger.warning("Could not show tray notification: %s", e)
 
@@ -78,17 +90,85 @@ class JarvisTray:
             except Exception:
                 pass
 
+    def _on_edit_config_clicked(self, icon: pystray.Icon, item: Any) -> None:
+        """Opens config.yaml in the system editor."""
+        from jarvis.config import BASE_DIR
+        cfg_path = BASE_DIR / "config.yaml"
+        logger.info("Tray menu: Opening configuration file at %s", cfg_path)
+        try:
+            if not cfg_path.exists():
+                cfg_path.touch()
+            os.startfile(str(cfg_path))
+        except Exception as e:
+            logger.error("Failed to open config.yaml: %s", e)
+
+    def _on_edit_env_clicked(self, icon: pystray.Icon, item: Any) -> None:
+        """Opens .env file in Notepad."""
+        import subprocess
+        from jarvis.config import BASE_DIR
+        env_path = BASE_DIR / ".env"
+        logger.info("Tray menu: Opening environment file at %s", env_path)
+        try:
+            if not env_path.exists():
+                env_path.touch()
+            subprocess.Popen(["notepad.exe", str(env_path)])
+        except Exception as e:
+            logger.error("Failed to open .env: %s", e)
+
+    def _on_reload_config_clicked(self, icon: pystray.Icon, item: Any) -> None:
+        """Reloads settings and wake word phrase without restarting."""
+        logger.info("Tray menu: Reload configuration triggered.")
+        try:
+            if self.on_reload:
+                self.on_reload()
+            else:
+                from jarvis.config import reload_config
+                reload_config()
+            icon.notify("Configuration reloaded successfully.", title="Jarvis Assistant")
+        except Exception as e:
+            logger.error("Failed to reload configuration: %s", e)
+            try:
+                icon.notify(f"Reload failed: {e}", title="Jarvis Assistant")
+            except Exception:
+                pass
+
+    def _on_toggle_console_clicked(self, icon: pystray.Icon, item: Any) -> None:
+        """Toggles visibility of the attached Windows console window."""
+        import ctypes
+        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+        if not hwnd:
+            try:
+                icon.notify("No console window is attached to this process.", title="Jarvis Assistant")
+            except Exception:
+                pass
+            return
+        self.console_visible = not self.console_visible
+        # SW_SHOW = 5, SW_HIDE = 0
+        ctypes.windll.user32.ShowWindow(hwnd, 5 if self.console_visible else 0)
+
     def _on_text_mode_clicked(self, icon: pystray.Icon, item: Any) -> None:
         """Opens or gives guidance on text mode."""
         logger.info("Tray menu: Text mode selected.")
         try:
-            icon.notify("Run 'python main.py --text' in a terminal for text console mode.", title="Jarvis Text Mode")
+            icon.notify("Run 'jarvis.exe --text' or 'python main.py --text' for CLI console mode.", title="Jarvis Text Mode")
         except Exception:
             pass
 
+    def _on_open_data_clicked(self, icon: pystray.Icon, item: Any) -> None:
+        """Opens data directory in Windows Explorer."""
+        from jarvis.config import BASE_DIR
+        data_dir = (BASE_DIR / "data").resolve()
+        data_dir.mkdir(parents=True, exist_ok=True)
+        logger.info("Tray menu: Opening data folder at %s", data_dir)
+        try:
+            os.startfile(str(data_dir))
+        except Exception as e:
+            logger.error("Failed to open data directory: %s", e)
+
     def _on_open_logs_clicked(self, icon: pystray.Icon, item: Any) -> None:
         """Opens logs directory in Windows Explorer."""
-        logs_dir = Path("logs").resolve()
+        from jarvis.config import BASE_DIR
+        logs_dir = (BASE_DIR / "logs").resolve()
         logs_dir.mkdir(parents=True, exist_ok=True)
         logger.info("Tray menu: Opening logs folder at %s", logs_dir)
         try:
@@ -123,11 +203,18 @@ class JarvisTray:
                 lambda item: "Resume listening" if self.is_paused else "Pause listening",
                 self._on_toggle_pause_clicked,
             ),
-            pystray.MenuItem("Text mode", self._on_text_mode_clicked),
-            pystray.MenuItem("Open logs folder", self._on_open_logs_clicked),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Stop current task", self._on_stop_task_clicked),
-            pystray.MenuItem("Quit", self._on_quit_clicked),
+            pystray.MenuItem("Configure (config.yaml)", self._on_edit_config_clicked),
+            pystray.MenuItem("Configure Keys (.env)", self._on_edit_env_clicked),
+            pystray.MenuItem("Reload Configuration", self._on_reload_config_clicked),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Toggle Console Window", self._on_toggle_console_clicked),
+            pystray.MenuItem("Open Data Folder", self._on_open_data_clicked),
+            pystray.MenuItem("Open Logs Folder", self._on_open_logs_clicked),
+            pystray.MenuItem("Text Mode Info", self._on_text_mode_clicked),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Stop Current Task (Ctrl+Alt+J)", self._on_stop_task_clicked),
+            pystray.MenuItem("Quit Jarvis", self._on_quit_clicked),
         )
 
     def start(self) -> None:
