@@ -69,3 +69,25 @@ def test_memory_tools():
     res_for = forget(key="coffee_order")
     assert res_for.ok is True
     assert "Forgot" in res_for.output
+
+
+def test_memory_cross_session_recall_and_action():
+    """Verifies storing a fact, restarting Jarvis context, and verifying persistent recall."""
+    from jarvis.brain.context import ContextManager
+    from jarvis.brain.prompts import build_system_prompt
+
+    # 1. Store preference in SQLite memory
+    res = remember(key="favorite music app", value="Spotify")
+    assert res.ok is True
+
+    # 2. Simulate restarting Jarvis (new context session)
+    fresh_context = ContextManager()
+    assert len(fresh_context.exchanges) == 0
+
+    # 3. Build system prompt from long-term memory store
+    prompt = build_system_prompt()
+    assert "favorite music app: Spotify" in prompt
+
+    # Cleanup
+    delete_fact("favorite music app")
+

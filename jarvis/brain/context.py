@@ -64,6 +64,13 @@ class ContextManager:
         if len(self.exchanges) > max_exchanges:
             self.exchanges = self.exchanges[-max_exchanges:]
 
+        # Persist to long-term SQLite history table
+        try:
+            from jarvis.brain.memory import add_history
+            add_history(user_text, assistant_reply)
+        except Exception as e:
+            logger.warning("Could not persist turn to history: %s", e)
+
     def update_session_state(self, tc: ToolCall, result: ToolResult) -> None:
         """Updates session state entities based on executed tool calls."""
         if tc.name == "open_app" and result.ok:

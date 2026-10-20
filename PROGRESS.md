@@ -24,9 +24,9 @@
   - Tray icon and menu (`tray.py`)
 - [x] **Phase 6: Screen vision**
   - `screen.py` screenshot, scaling/DPI aware coordinate translation, UIA tools, vision click
-- [ ] **Phase 7: Memory + browser automation**
-  - SQLite long-term memory (`memory.py`)
-  - Playwright persistent browser automation
+- [x] **Phase 7: Memory + browser automation**
+  - SQLite long-term memory (`memory.py`) with facts and history tables, secret filtering
+  - Playwright persistent browser automation (`data/browser_profile`, headed/headless, click, type, read)
 - [ ] **Phase 8: Run on startup + polish**
   - Windows startup registration script (`install_startup.py`)
   - Named mutex single-instance lock, crash recovery, first-run setup check

@@ -46,5 +46,10 @@
 - **Native UI Automation First**: Dedicated tools `get_ui_elements` and `click_ui_element` leverage `pywinauto` with the UIA backend to inspect control hierarchies, names, types, and bounding rectangles. Ampersand accelerator keys are normalized and windows are brought to focus prior to interaction.
 - **Vision Routing & Graceful Fallback**: For providers without image vision support, `read_screen_text` and `take_screenshot` provide structural descriptions based on active window and visible windows without crashing or sending raw images to text-only LLMs.
 
-
-
+## Phase 7 Decisions
+- **Persistent Long-Term SQLite Memory**: Database stored at `data/memory.db` with `facts` (key, value, created_at, updated_at) and `history` (role, content, timestamp) tables. Includes thread-safe locking and automatic migrations.
+- **Sensitive Credential Shielding**: Memory manager regex and keyword filters unconditionally reject attempts to store credentials, tokens, passwords, or API keys (`sk-`, `gsk_`, `token`, `bearer`, etc.).
+- **Automatic Context History & Fact Injection**: System prompts dynamically incorporate stored facts up to a 1500-character budget. Every assistant turn automatically archives exchanges into the persistent history table.
+- **Persistent Playwright Automation**: Profile stored at `data/browser_profile` to preserve cookies, sessions, and state across restarts. Browser launches headed by default for user visibility, falling back seamlessly to headless mode when running in headless environments.
+- **URL Scheme Normalization**: Implemented `_normalize_url` helper in `jarvis/tools/web.py` supporting `http://`, `https://`, `data:`, `file://`, and `about:` schemas without prepending redundant protocol prefixes.
+- **Natural Language Memory & Web Tools**: Added `@tool` interfaces `remember`, `recall`, `forget`, `browser_open`, `browser_click`, `browser_type`, `browser_read`, and `browser_close`.
