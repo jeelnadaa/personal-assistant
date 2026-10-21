@@ -637,7 +637,7 @@ class SettingsWindow(QWidget):
         if p == "groq":
             self.txt_llm_model.setText("qwen/qwen3.8-27b")
         elif p == "gemini":
-            self.txt_llm_model.setText("gemini-3.5-flash")
+            self.txt_llm_model.setText("gemini-2.5-flash")
         elif p == "anthropic":
             self.txt_llm_model.setText("claude-sonnet-5-5")
 
@@ -650,7 +650,7 @@ class SettingsWindow(QWidget):
             self.lbl_fallback_model.setVisible(True)
             self.txt_fallback_model.setVisible(True)
             if p == "gemini":
-                self.txt_fallback_model.setText("gemini-3.5-flash")
+                self.txt_fallback_model.setText("gemini-2.5-flash")
             elif p == "anthropic":
                 self.txt_fallback_model.setText("claude-sonnet-5-5")
             elif p == "groq":
