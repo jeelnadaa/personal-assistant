@@ -80,6 +80,9 @@
   - **High-DPI Window Positioning**: Replaced `self.setGeometry(x, y, w, h)` with `self.move(x, y)` in `ActivePopupCard.reposition_above_taskbar()`, letting Qt's internal layout manager govern height on high-DPI (150% scaling) screens without triggering Windows min-track geometry warnings (`QWindowsWindow::setGeometry: Unable to set geometry 690x182... Resulting geometry: 690x215`).
   - **Native Windows GUI Executable**: Set `console=False` in `jarvis.spec` and redirected standard streams; `jarvis.exe` now launches cleanly without opening a black command prompt window.
   - **Zero `.env` Dependency in Portable Distribution**: Removed frozen auto-creation of `.env` files and purged `.env` from `dist/Jarvis-Portable-Windows/` and `Jarvis-Portable-Windows.zip`. All configuration is managed seamlessly in-app via `%LOCALAPPDATA%\Jarvis\settings.json` and the DPAPI vault.
-  - **Full Test Suite Passing**: All 108 automated unit tests passing cleanly.
+  - **Clean Tray Shutdown & Deadlock Elimination**: Switched Qt exit in tray quit callback from `app.quit()` to `QMetaObject.invokeMethod(qt_app, "quit", Qt.ConnectionType.QueuedConnection)`, eliminating main GUI thread deadlock when quitting from system tray.
+  - **Ghost Tray Icon Removal**: Added `self.icon.visible = False` in `_on_quit_clicked` and `stop()` to immediately remove the tray notification icon from Windows taskbar notification area upon exit.
+  - **Black Bar Artifact Fix**: Added explicit handling in `JarvisOverlay._on_set_state` for `PAUSED`, `STOPPED`, `QUIT`, and `CLOSED` states and implemented `close_all()` to ensure popup cards and idle pills are cleanly hidden on shutdown rather than displaying a blank container box.
+  - **Full Test Suite Passing**: All 110 automated unit tests passing cleanly.
 
 

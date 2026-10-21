@@ -191,7 +191,14 @@ class JarvisTray:
         logger.info("Tray menu: Quit selected.")
         cancel_current_task()
         stop_speech()
-        icon.stop()
+        try:
+            icon.visible = False
+        except Exception:
+            pass
+        try:
+            icon.stop()
+        except Exception:
+            pass
         if self.on_quit:
             self.on_quit()
 
@@ -266,6 +273,10 @@ class JarvisTray:
     def stop(self) -> None:
         """Stops the tray icon if running."""
         if self.icon:
+            try:
+                self.icon.visible = False
+            except Exception:
+                pass
             try:
                 self.icon.stop()
             except Exception:

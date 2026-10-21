@@ -537,6 +537,11 @@ class JarvisOverlay(QWidget):
                 self.idle_pill.position_at_bottom_center()
             else:
                 self.idle_pill.hide()
+        elif state_upper in ("PAUSED", "STOPPED", "QUIT", "CLOSED"):
+            self.popup_card.hide()
+            self.idle_pill.hide()
+            if self._settings_window:
+                self._settings_window.hide()
         else:
             self.idle_pill.hide()
             self.popup_card.set_mode(state_upper, text=message, query=self.last_query)
@@ -619,6 +624,27 @@ class JarvisOverlay(QWidget):
         self._settings_window.show()
         self._settings_window.raise_()
         self._settings_window.activateWindow()
+
+    def close_all(self) -> None:
+        """Hides and closes all overlay popups, floating pills, and settings windows."""
+        try:
+            self.popup_card.hide()
+            self.popup_card.close()
+        except Exception:
+            pass
+        try:
+            self.idle_pill.hide()
+            self.idle_pill.close()
+        except Exception:
+            pass
+        if self._settings_window:
+            try:
+                self._settings_window.hide()
+                self._settings_window.close()
+            except Exception:
+                pass
+        self.hide()
+        self.close()
 
 
 # Singleton holder

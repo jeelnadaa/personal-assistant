@@ -222,8 +222,15 @@ def run_voice_gui_mode(show_console: bool = False) -> None:
     overlay.set_close_handler(app.dismiss_to_idle)
 
     def on_quit() -> None:
-        app.stop()
-        qt_app.quit()
+        try:
+            overlay.close_all()
+        except Exception:
+            pass
+        try:
+            app.stop()
+        except Exception:
+            pass
+        QtCore.QMetaObject.invokeMethod(qt_app, "quit", QtCore.Qt.ConnectionType.QueuedConnection)
 
     if app.tray:
         app.tray.on_quit = on_quit
@@ -248,6 +255,10 @@ def run_voice_gui_mode(show_console: bool = False) -> None:
     except (KeyboardInterrupt, SystemExit):
         print("\nStopping Jarvis...")
     finally:
+        try:
+            overlay.close_all()
+        except Exception:
+            pass
         app.stop()
 
 
@@ -385,6 +396,7 @@ def main() -> None:
     finally:
         if mutex:
             mutex.release()
+    sys.exit(0)
 
 
 if __name__ == "__main__":

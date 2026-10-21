@@ -113,6 +113,18 @@ class TestTrayPersistenceAndActions(unittest.TestCase):
             self.assertFalse(self.tray.is_paused)
             mock_mic.resume_wakeword.assert_called_once()
 
+    def test_quit_hides_icon_and_triggers_callback(self) -> None:
+        """Quitting from tray should hide icon, cancel tasks, stop speech, and invoke on_quit."""
+        mock_icon = MagicMock()
+        with patch("jarvis.ui.tray.cancel_current_task") as mock_cancel, \
+             patch("jarvis.ui.tray.stop_speech") as mock_stop_speech:
+            self.tray._on_quit_clicked(mock_icon, None)
+            self.assertFalse(mock_icon.visible)
+            mock_icon.stop.assert_called_once()
+            mock_cancel.assert_called_once()
+            mock_stop_speech.assert_called_once()
+            self.on_quit_mock.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

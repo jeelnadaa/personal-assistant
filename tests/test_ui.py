@@ -316,3 +316,24 @@ def test_wake_greeting_routed_to_tts_speak():
         assert result is True
         mock_speak.assert_called_once_with("Yes sir, what's on your mind?", block=True)
 
+
+def test_overlay_paused_and_close_all_hides_windows(qapp):
+    """Verifies PAUSED/STOPPED states and close_all immediately hide popup cards and pills."""
+    from jarvis.ui.overlay import JarvisOverlay
+
+    overlay = JarvisOverlay()
+    # Transition to LISTENING (popup card visible)
+    overlay._on_set_state("LISTENING", "Listening...")
+    assert overlay.popup_card.isVisible()
+
+    # Transition to PAUSED (stops app; should hide popup card and idle pill, no empty black box)
+    overlay._on_set_state("PAUSED", "Stopped")
+    assert not overlay.popup_card.isVisible()
+    assert not overlay.idle_pill.isVisible()
+
+    # Transition back to IDLE, then call close_all()
+    overlay._on_set_state("IDLE")
+    overlay.close_all()
+    assert not overlay.popup_card.isVisible()
+    assert not overlay.idle_pill.isVisible()
+
