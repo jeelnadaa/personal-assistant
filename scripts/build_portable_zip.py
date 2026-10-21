@@ -58,6 +58,13 @@ def build_onedir() -> None:
     print(f"\nBuilding portable onedir application with PyInstaller from {SPEC_FILE.name}...")
     t0 = time.perf_counter()
 
+    if RELEASE_DIR.exists():
+        try:
+            shutil.rmtree(RELEASE_DIR)
+            time.sleep(1.0)
+        except Exception as e:
+            print(f" - Note during pre-clean: {e}")
+
     cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", str(SPEC_FILE)]
     result = subprocess.run(cmd, cwd=str(ROOT_DIR))
 
